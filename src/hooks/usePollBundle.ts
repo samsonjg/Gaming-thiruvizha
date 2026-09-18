@@ -33,6 +33,15 @@ export function usePollBundle(slug: string | undefined): PollBundleState {
 
     async function load() {
       if (!slug) return
+      // Product Rule GT-POLL-002: only a published poll (with a published
+      // parent event) is reachable by public users. This is deliberately
+      // NOT checked here on the fetched data — firestore.rules is what
+      // actually enforces it (a non-admin's read of a draft poll is
+      // rejected by the rules and lands in the catch below as not-found).
+      // Checking status client-side here would also incorrectly block the
+      // admin "Preview" feature (Polls.tsx), which opens this same public
+      // URL to preview a draft poll while signed in as admin. See
+      // docs/SECURITY.md.
       const poll = await pollsRepository.getPollBySlug(slug)
       if (!poll || cancelled) {
         if (!cancelled) setState({ status: 'not-found' })

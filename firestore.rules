@@ -1,0 +1,113 @@
+rules_version = '2';
+
+// Authorization boundary for the whole app — see docs/SECURITY.md and
+// docs/FIREBASE_SCHEMA.md. The client-side admin route guard
+// (features/auth/RequireAdmin.tsx) is UX only; THIS file is what actually
+// stops a non-admin from reading or writing admin data. Never weaken a
+// rule here to work around a client bug — fix the client.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Admin authorization is the `admin` custom claim on the ID token,
+    // set manually via the Firebase CLI/console — see docs/ADMIN_PANEL.md
+    // "Bootstrapping the first admin". No document field and no client
+    // code path can grant this.
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.admin == true;
+    }
+
+    // ---------------- events ----------------
+    // Product Rule (docs/PRD.md GT-EVENT-001, GT-POLL-002): only published
+    // events/polls are visible to public users; admins see everything
+    // (drafts included, for editing).
+    match /events/{eventId} {
+      allow read: if resource.data.status == 'published' || isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // ---------------- polls + nested questions/options ----------------
+    match /polls/{pollId} {
+      allow read: if resource.data.status == 'published' || isAdmin();
+      allow write: if isAdmin();
+
+      match /questions/{questionId} {
+        allow read: if resource.data.status == 'published' || isAdmin();
+        allow write: if isAdmin();
+
+        match /options/{optionId} {
+          // An option is readable whenever its parent question is
+          // (published, or admin) — one extra read to check the parent's
+          // status since options don't carry their own `status` field.
+          allow read: if isAdmin()
+            || get(/databases/$(database)/documents/polls/$(pollId)/questions/$(questionId)).data.status == 'published';
+          allow write: if isAdmin();
+        }
+      }
+
+      // ---------------- responses (admin-only reads, immutable) ----------------
+      // Product Rule (docs/PRD.md GT-RESULTS-001): public users never read
+      // another user's individual response. Doc id is `{uid}_{questionId}`
+      // (see repositories/responses.repository.ts) — that shape is what
+      // makes "one response per user per question" physically enforceable
+      // here: a second write to the same id is an *update*, which is
+      // disallowed below, not a second *create*.
+      match /responses/{responseId} {
+        allow get: if isAdmin();
+        allow list: if isAdmin();
+
+        allow create: if isSignedIn()
+          && responseId.split('_')[0] == request.auth.uid
+          && request.resource.data.sessionId == request.auth.uid
+          && request.resource.data.pollId == pollId
+          && request.resource.data.questionId == responseId.split('_')[1];
+
+        // Responses are immutable from the client, including for admins —
+        // there is no edit/delete UI, and adding one is a deliberate
+        // future decision (would likely need a Cloud Function for audit
+        // logging), not an oversight. See docs/SECURITY.md.
+        allow update, delete: if false;
+      }
+
+      // ---------------- questionStats (public aggregate counters) ----------------
+      // Product Rule (docs/PRD.md GT-RESULTS-001, "Aggregated Results"):
+      // this is the ONLY response-derived data a public user can read —
+      // counts only, never who answered what. Written atomically in the
+      // same batch as the response `create` (see
+      // repositories/responses.repository.ts submitAnswer).
+      //
+      // Known limitation (see docs/SECURITY.md): any signed-in user
+      // (including an anonymous session) can currently write to this
+      // document, since Firestore rules can't cheaply verify "this write
+      // is exactly an increment(1)" without a Cloud Function owning the
+      // write. A malicious client could in principle corrupt these
+      // counters. Accepted for now (low stakes: display-only aggregate,
+      // not used for anything financial or security-sensitive); revisit
+      // with a Cloud Function if that risk profile changes.
+      match /questionStats/{questionId} {
+        allow read: if true;
+        allow create, update: if isSignedIn();
+        allow delete: if isAdmin();
+      }
+    }
+
+    // ---------------- sessions (optional attribution capture) ----------------
+    match /sessions/{uid} {
+      allow read, write: if isSignedIn() && request.auth.uid == uid;
+      allow read: if isAdmin();
+    }
+
+    // ---------------- adminUsers (display profile only — NOT authorization) ----------------
+    // This collection is for showing an admin's name/email in the UI. It
+    // is never read by security rules to decide `isAdmin()` — that is
+    // always the custom claim. Written manually alongside the custom
+    // claim bootstrap (docs/ADMIN_PANEL.md), never by the app itself.
+    match /adminUsers/{uid} {
+      allow read: if isSignedIn() && (request.auth.uid == uid || isAdmin());
+      allow write: if false;
+    }
+  }
+}
