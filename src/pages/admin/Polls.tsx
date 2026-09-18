@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import * as dataService from '../../services/dataService'
+import * as eventsRepository from '../../repositories/events.repository'
+import * as pollsRepository from '../../repositories/polls.repository'
+import * as questionsRepository from '../../repositories/questions.repository'
+import * as responsesRepository from '../../repositories/responses.repository'
 import type { Poll, EventRecord } from '../../types/schema'
-import { PageHeader, Card, Badge, Button, LinkButton, IconButton } from '../../components/admin/ui'
+import { PageHeader, Card, Badge, Button, LinkButton, IconButton } from '../../components/ui'
 
 interface PollRow {
   poll: Poll
@@ -18,13 +21,13 @@ export function Polls() {
   const [copiedId, setCopiedId] = useState<string | null>(null)
 
   async function load() {
-    const polls = await dataService.getPolls(eventIdFilter)
+    const polls = await pollsRepository.getPolls(eventIdFilter)
     const rows = await Promise.all(
       polls.map(async (poll) => {
         const [event, questions, responses] = await Promise.all([
-          dataService.getEvent(poll.eventId),
-          dataService.getQuestions(poll.id),
-          dataService.getResponseRows({ pollId: poll.id }),
+          eventsRepository.getEvent(poll.eventId),
+          questionsRepository.getQuestions(poll.id),
+          responsesRepository.getResponseRows({ pollId: poll.id }),
         ])
         return { poll, event, questionCount: questions.length, responseCount: responses.length }
       }),
@@ -52,18 +55,18 @@ export function Polls() {
   }
 
   async function togglePublish(poll: Poll) {
-    await dataService.updatePoll(poll.id, { status: poll.status === 'published' ? 'draft' : 'published' })
+    await pollsRepository.updatePoll(poll.id, { status: poll.status === 'published' ? 'draft' : 'published' })
     load()
   }
 
   async function duplicate(poll: Poll) {
-    await dataService.duplicatePoll(poll.id)
+    await pollsRepository.duplicatePoll(poll.id)
     load()
   }
 
   async function remove(poll: Poll) {
     if (!confirm(`Delete poll "${poll.name}"? This cannot be undone.`)) return
-    await dataService.deletePoll(poll.id)
+    await pollsRepository.deletePoll(poll.id)
     load()
   }
 

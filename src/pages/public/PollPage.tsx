@@ -1,71 +1,45 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useParams } from 'react-router-dom'
-import type { AnswerValue, EventRecord, Poll, Question, QuestionOption } from '../../types/schema'
-import * as dataService from '../../services/dataService'
-import { getOrCreateSession } from '../../services/session'
+import type { AnswerValue } from '../../types/schema'
+import { usePollBundle } from '../../hooks/usePollBundle'
+import { useSession } from '../../hooks/useSession'
+import * as responsesRepository from '../../repositories/responses.repository'
+import * as statsRepository from '../../repositories/stats.repository'
+import type { OptionResult } from '../../repositories/stats.repository'
 import { PollLanding } from './PollLanding'
 import { PollFlow } from './PollFlow'
 import { PollResults } from './PollResults'
 import { PollComplete } from './PollComplete'
 
-type Phase = 'loading' | 'not-found' | 'landing' | 'flow' | 'results' | 'complete'
+type FlowPhase = 'landing' | 'flow' | 'results' | 'complete'
 
 export function PollPage() {
   const { slug } = useParams<{ slug: string }>()
-  const [phase, setPhase] = useState<Phase>('loading')
-  const [event, setEvent] = useState<EventRecord | null>(null)
-  const [poll, setPoll] = useState<Poll | null>(null)
-  const [questions, setQuestions] = useState<Question[]>([])
-  const [optionsByQuestion, setOptionsByQuestion] = useState<Map<string, QuestionOption[]>>(new Map())
+  const bundleState = usePollBundle(slug)
+  const session = useSession()
+
+  const [phase, setPhase] = useState<FlowPhase>('landing')
   const [currentIndex, setCurrentIndex] = useState(0)
   const [alreadyAnswered, setAlreadyAnswered] = useState(false)
-  const [results, setResults] = useState<dataService.OptionResult[]>([])
+  const [results, setResults] = useState<OptionResult[]>([])
 
-  const session = getOrCreateSession()
+  if (bundleState.status === 'loading') {
+    return <CenteredMessage text="Loading poll…" />
+  }
 
-  useEffect(() => {
-    let cancelled = false
+  if (bundleState.status === 'not-found') {
+    return <CenteredMessage text="This poll could not be found." />
+  }
 
-    async function load() {
-      if (!slug) return
-      const p = await dataService.getPollBySlug(slug)
-      if (!p) {
-        if (!cancelled) setPhase('not-found')
-        return
-      }
-      const [ev, qs] = await Promise.all([dataService.getEvent(p.eventId), dataService.getPublishedQuestions(p.id)])
-      if (!ev || cancelled) return
-
-      const optMap = new Map<string, QuestionOption[]>()
-      await Promise.all(
-        qs.map(async (q) => {
-          const opts = await dataService.getOptions(q.id)
-          optMap.set(q.id, opts)
-        }),
-      )
-
-      if (cancelled) return
-      setPoll(p)
-      setEvent(ev)
-      setQuestions(qs)
-      setOptionsByQuestion(optMap)
-      setPhase('landing')
-    }
-
-    load()
-    return () => {
-      cancelled = true
-    }
-  }, [slug])
+  const { event, poll, questions, optionsByQuestion } = bundleState.bundle
 
   async function checkAlreadyAnswered(questionId: string) {
-    if (!poll) return false
-    return dataService.hasResponded(session.sessionId, poll.id, questionId)
+    return responsesRepository.hasResponded(session.sessionId, poll.id, questionId)
   }
 
   async function startPoll() {
     setCurrentIndex(0)
-    const already = await checkAlreadyAnswered(questions[0].id)
+    const already = questions[0] ? await checkAlreadyAnswered(questions[0].id) : false
     setAlreadyAnswered(already)
     setPhase('flow')
   }
@@ -73,9 +47,8 @@ export function PollPage() {
   async function advance() {
     const nextIndex = currentIndex + 1
     if (nextIndex >= questions.length) {
-      // Show aggregated results for the first (headline) question with visible results.
       const headline = questions.find((q) => q.settings.resultsVisible) ?? questions[0]
-      const res = await dataService.getOptionResults(headline.id)
+      const res = headline ? await statsRepository.getOptionResults(headline.id) : []
       setResults(res)
       setPhase('results')
       return
@@ -86,8 +59,7 @@ export function PollPage() {
   }
 
   async function handleSubmit(questionId: string, value: AnswerValue) {
-    if (!poll) return
-    await dataService.submitAnswer({
+    await responsesRepository.submitAnswer({
       pollId: poll.id,
       questionId,
       sessionId: session.sessionId,
@@ -96,14 +68,6 @@ export function PollPage() {
       value,
     })
     await advance()
-  }
-
-  if (phase === 'loading') {
-    return <CenteredMessage text="Loading poll…" />
-  }
-
-  if (phase === 'not-found' || !event || !poll) {
-    return <CenteredMessage text="This poll could not be found." />
   }
 
   const headline = questions.find((q) => q.settings.resultsVisible) ?? questions[0]

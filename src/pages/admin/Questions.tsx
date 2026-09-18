@@ -10,11 +10,13 @@ import {
 } from '@dnd-kit/core'
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import * as dataService from '../../services/dataService'
+import * as pollsRepository from '../../repositories/polls.repository'
+import * as questionsRepository from '../../repositories/questions.repository'
+import * as responsesRepository from '../../repositories/responses.repository'
 import type { Question, Poll } from '../../types/schema'
-import { QUESTION_TYPE_META } from '../../types/questionTypeMeta'
-import { PageHeader, Card, Badge, Button, LinkButton, IconButton } from '../../components/admin/ui'
-import { PublishModal } from './PublishModal'
+import { QUESTION_TYPE_META } from '../../constants/questionTypeMeta'
+import { PageHeader, Card, Badge, Button, LinkButton, IconButton } from '../../components/ui'
+import { PublishModal } from '../../features/admin/PublishModal'
 
 export function Questions() {
   const { pollId } = useParams<{ pollId: string }>()
@@ -26,9 +28,9 @@ export function Questions() {
   async function load() {
     if (!pollId) return
     const [p, qs, rows] = await Promise.all([
-      dataService.getPoll(pollId),
-      dataService.getQuestions(pollId),
-      dataService.getResponseRows({ pollId }),
+      pollsRepository.getPoll(pollId),
+      questionsRepository.getQuestions(pollId),
+      responsesRepository.getResponseRows({ pollId }),
     ])
     setPoll(p ?? null)
     setQuestions(qs)
@@ -53,26 +55,26 @@ export function Questions() {
     const newIndex = questions.findIndex((q) => q.id === over.id)
     const reordered = arrayMove(questions, oldIndex, newIndex)
     setQuestions(reordered)
-    await dataService.reorderQuestions(
+    await questionsRepository.reorderQuestions(
       pollId,
       reordered.map((q) => q.id),
     )
   }
 
   async function duplicate(id: string) {
-    await dataService.duplicateQuestion(id)
+    await questionsRepository.duplicateQuestion(id)
     load()
   }
 
   async function remove(id: string) {
     if (!confirm('Delete this question? This cannot be undone.')) return
-    await dataService.deleteQuestion(id)
+    await questionsRepository.deleteQuestion(id)
     load()
   }
 
   async function toggleStatus(q: Question) {
     if (q.status === 'published') {
-      await dataService.updateQuestion(q.id, { status: 'unpublished' })
+      await questionsRepository.updateQuestion(q.id, { status: 'unpublished' })
       load()
     } else {
       setPublishTarget(q)
@@ -81,7 +83,7 @@ export function Questions() {
 
   async function confirmPublish() {
     if (!publishTarget) return
-    await dataService.updateQuestion(publishTarget.id, { status: 'published' })
+    await questionsRepository.updateQuestion(publishTarget.id, { status: 'published' })
     setPublishTarget(null)
     load()
   }

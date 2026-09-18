@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Modal, Button } from '../../components/admin/ui'
+import { Modal, Button } from '../../components/ui'
 
 export function PublishModal({
   open,

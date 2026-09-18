@@ -1,4 +1,4 @@
-import type { QuestionTypeMeta, QuestionType } from './schema'
+import type { QuestionTypeMeta, QuestionType } from '../types/schema'
 
 // Single source of truth driving the admin type dropdown + validation +
 // which QuestionRenderer branch to use. Adding a new question type means

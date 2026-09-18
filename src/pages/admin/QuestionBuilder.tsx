@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import * as dataService from '../../services/dataService'
+import * as questionsRepository from '../../repositories/questions.repository'
+import * as optionsRepository from '../../repositories/options.repository'
 import type { Question, QuestionType } from '../../types/schema'
-import { QUESTION_TYPE_LIST, QUESTION_TYPE_META } from '../../types/questionTypeMeta'
-import { PageHeader, Card, Input, Textarea, Select, Button, Toggle, IconButton } from '../../components/admin/ui'
-import { PublishModal } from './PublishModal'
+import { QUESTION_TYPE_LIST, QUESTION_TYPE_META } from '../../constants/questionTypeMeta'
+import { PageHeader, Card, Input, Textarea, Select, Button, Toggle, IconButton } from '../../components/ui'
+import { PublishModal } from '../../features/admin/PublishModal'
 
 type DraftOption = { id: string; label: string; emoji: string; imageUrl: string; active: boolean }
 
@@ -31,7 +32,7 @@ export function QuestionBuilder() {
 
   useEffect(() => {
     if (isNew || !questionId) return
-    dataService.getQuestion(questionId).then(async (q) => {
+    questionsRepository.getQuestion(questionId).then(async (q) => {
       if (!q) return
       setTitle(q.title)
       setDescription(q.description ?? '')
@@ -40,7 +41,7 @@ export function QuestionBuilder() {
       setResultsVisible(q.settings.resultsVisible)
       setRandomizeOptions(q.settings.randomizeOptions)
       setRatingScale(q.settings.ratingScale ?? 5)
-      const opts = await dataService.getOptions(questionId)
+      const opts = await optionsRepository.getOptions(questionId)
       if (opts.length) {
         setOptions(
           opts.map((o) => ({ id: o.id, label: o.label, emoji: o.emoji ?? '', imageUrl: o.imageUrl ?? '', active: o.active })),
@@ -65,7 +66,7 @@ export function QuestionBuilder() {
 
   async function persist(explicitStatus?: Question['status']): Promise<string | null> {
     setSaving(true)
-    const questions = pollId ? await dataService.getQuestions(pollId) : []
+    const questions = pollId ? await questionsRepository.getQuestions(pollId) : []
     const existing = savedId ? questions.find((q) => q.id === savedId) : undefined
     const status: Question['status'] = explicitStatus ?? existing?.status ?? 'draft'
     const payload: Omit<Question, 'id'> = {
@@ -85,15 +86,15 @@ export function QuestionBuilder() {
 
     let id = savedId
     if (id) {
-      await dataService.updateQuestion(id, payload)
+      await questionsRepository.updateQuestion(id, payload)
     } else {
-      const created = await dataService.createQuestion(payload)
+      const created = await questionsRepository.createQuestion(payload)
       id = created.id
       setSavedId(id)
     }
 
     if (meta.hasOptions) {
-      await dataService.setOptions(
+      await optionsRepository.setOptions(
         id!,
         options
           .filter((o) => o.label.trim().length > 0)
@@ -121,7 +122,7 @@ export function QuestionBuilder() {
   }
 
   async function confirmPublish() {
-    if (savedId) await dataService.updateQuestion(savedId, { status: 'published' })
+    if (savedId) await questionsRepository.updateQuestion(savedId, { status: 'published' })
     setShowPublish(false)
     navigate(`/admin/polls/${pollId}/questions`)
   }

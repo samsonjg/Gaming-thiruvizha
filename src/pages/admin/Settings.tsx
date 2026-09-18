@@ -1,10 +1,10 @@
-import * as dataService from '../../services/dataService'
-import { PageHeader, Card, Button } from '../../components/admin/ui'
+import { resetAllData } from '../../repositories'
+import { PageHeader, Card, Button } from '../../components/ui'
 
 export function Settings() {
   function handleReset() {
     if (!confirm('Reset all demo data back to the seeded defaults? This clears any changes made in this browser.')) return
-    dataService.resetAllData()
+    resetAllData()
     window.location.reload()
   }
 

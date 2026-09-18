@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion'
-import type { OptionResult } from '../../services/dataService'
-import { ResultBar } from '../../components/shared/ResultBar'
+import type { OptionResult } from '../../repositories/stats.repository'
+import { ResultBar } from '../../components/common/ResultBar'
 
 export function PollResults({
   results,

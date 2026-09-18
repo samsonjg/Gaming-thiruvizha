@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import * as dataService from '../../services/dataService'
+import * as eventsRepository from '../../repositories/events.repository'
 import type { EventRecord, EventStatus } from '../../types/schema'
-import { PageHeader, Card, Input, Textarea, Select, Button } from '../../components/admin/ui'
+import { PageHeader, Card, Input, Textarea, Select, Button } from '../../components/ui'
 
 const EMPTY: Omit<EventRecord, 'id'> = {
   name: '',
@@ -27,7 +27,7 @@ export function EventForm() {
 
   useEffect(() => {
     if (!isNew && id) {
-      dataService.getEvent(id).then((event) => {
+      eventsRepository.getEvent(id).then((event) => {
         if (event) setForm(event)
       })
     }
@@ -40,10 +40,10 @@ export function EventForm() {
   async function handleSave() {
     setSaving(true)
     if (isNew) {
-      const created = await dataService.createEvent(form)
+      const created = await eventsRepository.createEvent(form)
       navigate(`/admin/events/${created.id}`)
     } else if (id) {
-      await dataService.updateEvent(id, form)
+      await eventsRepository.updateEvent(id, form)
     }
     setSaving(false)
   }

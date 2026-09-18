@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import type { AnswerValue, Question, QuestionOption } from '../../types/schema'
-import { QuestionCard } from '../../components/shared/QuestionCard'
-import { QuestionRenderer, isAnswerValid } from '../../components/questions/QuestionRenderer'
-import { ProgressIndicator } from '../../components/shared/ProgressIndicator'
+import { QuestionCard } from '../../components/common/QuestionCard'
+import { QuestionRenderer, isAnswerValid } from '../../features/questions/QuestionRenderer'
+import { ProgressIndicator } from '../../components/common/ProgressIndicator'
 
 interface PollFlowProps {
   questions: Question[]

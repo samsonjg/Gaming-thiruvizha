@@ -1,21 +1,15 @@
-import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import * as dataService from '../../services/dataService'
 import { GT_POLL_ID } from '../../data/seed'
-import { PageHeader, MetricCard, Card } from '../../components/admin/ui'
-import { AnimatedCounter } from '../../components/shared/AnimatedCounter'
-import { ResultBar } from '../../components/shared/ResultBar'
+import { usePollAnalytics, useOptionResults } from '../../hooks/useAnalytics'
+import { PageHeader, MetricCard, Card, LoadingState } from '../../components/ui'
+import { AnimatedCounter } from '../../components/common/AnimatedCounter'
+import { ResultBar } from '../../components/common/ResultBar'
 
 export function Dashboard() {
-  const [analytics, setAnalytics] = useState<dataService.PollAnalytics | null>(null)
-  const [topOptions, setTopOptions] = useState<dataService.OptionResult[]>([])
+  const { data: analytics } = usePollAnalytics(GT_POLL_ID)
+  const { data: topOptions } = useOptionResults('q1-excited')
 
-  useEffect(() => {
-    dataService.getPollAnalytics(GT_POLL_ID).then(setAnalytics)
-    dataService.getOptionResults('q1-excited').then(setTopOptions)
-  }, [])
-
-  if (!analytics) return null
+  if (!analytics) return <LoadingState />
 
   const maxFunnel = Math.max(...analytics.funnel.map((f) => f.count), 1)
 
@@ -78,7 +72,7 @@ export function Dashboard() {
           <Card>
             <p className="mb-4 text-sm font-semibold text-admin-text">Most Popular Answers — Q1</p>
             <div className="flex flex-col gap-3">
-              {topOptions.slice(0, 5).map((o, i) => (
+              {(topOptions ?? []).slice(0, 5).map((o, i) => (
                 <ResultBar key={o.optionId} label={o.label} emoji={o.emoji} pct={o.pct} count={o.count} highlight={i === 0} theme="light" />
               ))}
             </div>

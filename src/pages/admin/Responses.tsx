@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
-import * as dataService from '../../services/dataService'
-import type { ResponseRow } from '../../services/dataService'
+import * as responsesRepository from '../../repositories/responses.repository'
+import * as optionsRepository from '../../repositories/options.repository'
+import type { ResponseRow } from '../../repositories/responses.repository'
 import { GT_POLL_ID } from '../../data/seed'
-import { QUESTION_TYPE_META } from '../../types/questionTypeMeta'
-import { PageHeader, Card, Select, Button, Badge } from '../../components/admin/ui'
+import { QUESTION_TYPE_META } from '../../constants/questionTypeMeta'
+import { PageHeader, Card, Select, Button, Badge } from '../../components/ui'
 
 function answerSummary(row: ResponseRow, optionLabels: Map<string, string>): string {
   const a = row.answer
@@ -23,10 +24,10 @@ export function Responses() {
   const [typeFilter, setTypeFilter] = useState('')
 
   useEffect(() => {
-    dataService.getResponseRows({ pollId: GT_POLL_ID }).then(async (rows) => {
+    responsesRepository.getResponseRows({ pollId: GT_POLL_ID }).then(async (rows) => {
       setRows(rows)
       const questionIds = [...new Set(rows.map((r) => r.response.questionId))]
-      const optionLists = await Promise.all(questionIds.map((id) => dataService.getOptions(id)))
+      const optionLists = await Promise.all(questionIds.map((id) => optionsRepository.getOptions(id)))
       const labels = new Map<string, string>()
       optionLists.flat().forEach((o) => labels.set(o.id, o.label))
       setOptionLabels(labels)

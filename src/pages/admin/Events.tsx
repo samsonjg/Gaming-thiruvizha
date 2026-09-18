@@ -1,14 +1,8 @@
-import { useEffect, useState } from 'react'
-import * as dataService from '../../services/dataService'
-import type { EventRecord } from '../../types/schema'
-import { PageHeader, Card, Badge, LinkButton } from '../../components/admin/ui'
+import { useEvents } from '../../hooks/useEvents'
+import { PageHeader, Card, Badge, LinkButton, LoadingState, ErrorState, EmptyState } from '../../components/ui'
 
 export function Events() {
-  const [events, setEvents] = useState<EventRecord[]>([])
-
-  useEffect(() => {
-    dataService.getEvents().then(setEvents)
-  }, [])
+  const { data: events, loading, error, reload } = useEvents()
 
   return (
     <div className="flex flex-col">
@@ -18,8 +12,12 @@ export function Events() {
         actions={<LinkButton to="/admin/events/new">+ New Event</LinkButton>}
       />
 
+      {loading && <LoadingState />}
+      {error && <ErrorState onRetry={reload} />}
+      {!loading && !error && events?.length === 0 && <EmptyState title="No events yet" />}
+
       <div className="flex flex-col gap-4 px-8 py-6">
-        {events.map((event) => (
+        {events?.map((event) => (
           <Card key={event.id} className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <div className="flex items-center gap-2">

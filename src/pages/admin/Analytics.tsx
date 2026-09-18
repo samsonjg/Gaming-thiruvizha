@@ -1,21 +1,22 @@
 import { useEffect, useState } from 'react'
-import * as dataService from '../../services/dataService'
+import * as statsRepository from '../../repositories/stats.repository'
+import type { PollAnalytics, OptionResult } from '../../repositories/stats.repository'
 import { GT_POLL_ID, seedQuestions } from '../../data/seed'
-import { PageHeader, Card, MetricCard } from '../../components/admin/ui'
-import { AnimatedCounter } from '../../components/shared/AnimatedCounter'
-import { ResultBar } from '../../components/shared/ResultBar'
+import { PageHeader, Card, MetricCard } from '../../components/ui'
+import { AnimatedCounter } from '../../components/common/AnimatedCounter'
+import { ResultBar } from '../../components/common/ResultBar'
 
 export function Analytics() {
-  const [analytics, setAnalytics] = useState<dataService.PollAnalytics | null>(null)
+  const [analytics, setAnalytics] = useState<PollAnalytics | null>(null)
   const [ratingStats, setRatingStats] = useState<{ average: number; count: number; distribution: Record<number, number> } | null>(null)
-  const [optionResults, setOptionResults] = useState<Record<string, dataService.OptionResult[]>>({})
+  const [optionResults, setOptionResults] = useState<Record<string, OptionResult[]>>({})
 
   useEffect(() => {
-    dataService.getPollAnalytics(GT_POLL_ID).then(setAnalytics)
-    dataService.getRatingAverage('q3-excitement-rating').then(setRatingStats)
+    statsRepository.getPollAnalytics(GT_POLL_ID).then(setAnalytics)
+    statsRepository.getRatingAverage('q3-excitement-rating').then(setRatingStats)
 
     const optionQuestions = seedQuestions.filter((q) => q.type === 'single_choice' || q.type === 'multiple_choice')
-    Promise.all(optionQuestions.map((q) => dataService.getOptionResults(q.id).then((r) => [q.id, r] as const))).then((entries) => {
+    Promise.all(optionQuestions.map((q) => statsRepository.getOptionResults(q.id).then((r) => [q.id, r] as const))).then((entries) => {
       setOptionResults(Object.fromEntries(entries))
     })
   }, [])
