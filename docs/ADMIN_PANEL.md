@@ -42,26 +42,16 @@ There is deliberately no "create the first admin" button anywhere in the app —
 
 1. Have the person who should be an admin sign in once. The simplest way: temporarily add a throwaway "create account" call, or use the Firebase console's Authentication tab → **Add user** → set an email + password directly. Either way, you end up with a normal (non-admin) Firebase Auth user.
 2. Find that user's UID in the Firebase console (Authentication → Users tab).
-3. Custom claims can't be set from the `firebase` CLI directly — they require the Admin SDK (server-side only; the web SDK used by this app's frontend cannot set its own claims, by design). The simplest path that needs no Cloud Function deployment is a short one-off Node script using the Admin SDK:
+3. Custom claims can't be set from the `firebase` CLI directly — they require the Admin SDK (server-side only; the web SDK used by this app's frontend cannot set its own claims, by design). Use the one-off script already in this repo: `scripts/set-admin-claim.cjs` (`.cjs` because `package.json` sets `"type": "module"` — a plain `.js` file would be loaded as ESM and `require()` would fail).
 
-   ```js
-   // scripts/set-admin-claim.js — run once, locally, with a service account key
-   // (Firebase console → Project settings → Service accounts → Generate new private key).
-   // Never commit the key file.
-   const admin = require('firebase-admin')
-   admin.initializeApp({ credential: admin.credential.cert(require('./service-account.json')) })
-
-   const uid = process.argv[2]
-   admin.auth().setCustomUserClaims(uid, { admin: true }).then(() => {
-     console.log(`Granted admin to ${uid}`)
-     process.exit(0)
-   })
-   ```
+   Download a service account key first (Firebase console → ⚙️ Project settings → Service accounts → **Generate new private key**), save it as `service-account.json` in the project root (already gitignored — `service-account*.json` and `*-firebase-adminsdk-*.json` are both excluded), then:
 
    ```bash
    npm install --no-save firebase-admin
-   node scripts/set-admin-claim.js <uid>
+   node scripts/set-admin-claim.cjs <uid>
    ```
+
+   Pass `--revoke` instead to remove the claim later.
 
 4. Have the admin sign out and back in (or wait up to an hour for the existing ID token to refresh) so the new claim is picked up. `[TBD]` a "force refresh" button in the UI would improve this — not built yet.
 5. Add a profile doc at `adminUsers/{uid}` (display name/email) via the Firebase console if you want their name to show in the UI — this is optional and has no effect on authorization (see `FIREBASE_SCHEMA.md`).
@@ -70,4 +60,4 @@ This script and the service account key are intentionally **not** part of this r
 
 ## Revoking admin access
 
-Same script, with `{ admin: false }` (or omit the claim key entirely) instead of `{ admin: true }`, then have that user sign out. There's no in-app "remove admin" button for the same reason there's no "add admin" button — this is a deliberately out-of-band operation.
+Same script, with `--revoke`, then have that user sign out. There's no in-app "remove admin" button for the same reason there's no "add admin" button — this is a deliberately out-of-band operation.
