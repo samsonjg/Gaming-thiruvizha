@@ -16,6 +16,9 @@ dist-ssr
 service-account*.json
 *-firebase-adminsdk-*.json
 
+# Firebase CLI local deploy cache
+.firebase
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

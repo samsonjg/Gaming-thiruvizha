@@ -31,10 +31,21 @@ export async function getPoll(id: string): Promise<Poll | undefined> {
 }
 
 // Product Rule: only a `published` poll is reachable by public users
-// (GT-POLL-002) — enforced by firestore.rules on the read, not here; this
-// helper is also used by admin, which must see draft polls too.
-export async function getPollBySlug(slug: string): Promise<Poll | undefined> {
-  const snap = await getDocs(query(collection(requireDb(), COLLECTION), where('publicSlug', '==', slug), limit(1)))
+// (GT-POLL-002) — enforced by firestore.rules on the read, not here.
+//
+// Firestore quirk: a `list`/query request is rejected outright unless the
+// rule can be proven from the query's own `where` clauses — it does NOT
+// evaluate "would this specific document pass" against the live data for
+// list requests the way a single `get` does. Our rule is
+// `resource.data.status == 'published' || isAdmin()`; the `isAdmin()`
+// branch is request-scoped (constant for the whole query) so an admin's
+// query passes with no extra filter, but a non-admin's query MUST include
+// an explicit `where('status', '==', 'published')` for Firestore to prove
+// every possible result satisfies the rule. See docs/SECURITY.md.
+export async function getPollBySlug(slug: string, isAdmin = false): Promise<Poll | undefined> {
+  const clauses = [where('publicSlug', '==', slug)]
+  if (!isAdmin) clauses.push(where('status', '==', 'published'))
+  const snap = await getDocs(query(collection(requireDb(), COLLECTION), ...clauses, limit(1)))
   const d = snap.docs[0]
   return d ? withId<Omit<Poll, 'id'>>(d) : undefined
 }

@@ -24,7 +24,7 @@ export type PollBundleState =
 // with each question's options. Used only by the public poll page — kept
 // as a hook (not inlined in the page) so it stays testable and reusable if
 // a second "resume a poll" entry point is ever added.
-export function usePollBundle(slug: string | undefined): PollBundleState {
+export function usePollBundle(slug: string | undefined, isAdmin = false): PollBundleState {
   const [state, setState] = useState<PollBundleState>({ status: 'loading' })
 
   useEffect(() => {
@@ -34,15 +34,13 @@ export function usePollBundle(slug: string | undefined): PollBundleState {
     async function load() {
       if (!slug) return
       // Product Rule GT-POLL-002: only a published poll (with a published
-      // parent event) is reachable by public users. This is deliberately
-      // NOT checked here on the fetched data — firestore.rules is what
-      // actually enforces it (a non-admin's read of a draft poll is
-      // rejected by the rules and lands in the catch below as not-found).
-      // Checking status client-side here would also incorrectly block the
-      // admin "Preview" feature (Polls.tsx), which opens this same public
-      // URL to preview a draft poll while signed in as admin. See
-      // docs/SECURITY.md.
-      const poll = await pollsRepository.getPollBySlug(slug)
+      // parent event) is reachable by public users — enforced by
+      // firestore.rules. `isAdmin` is passed through so an admin's own
+      // "Preview" of a draft poll (Polls.tsx opens this same public URL)
+      // still works; see the comment on getPollBySlug in
+      // polls.repository.ts for why a non-admin query needs an explicit
+      // status filter to be allowed at all. See docs/SECURITY.md.
+      const poll = await pollsRepository.getPollBySlug(slug, isAdmin)
       if (!poll || cancelled) {
         if (!cancelled) setState({ status: 'not-found' })
         return
@@ -85,7 +83,7 @@ export function usePollBundle(slug: string | undefined): PollBundleState {
     return () => {
       cancelled = true
     }
-  }, [slug])
+  }, [slug, isAdmin])
 
   return state
 }

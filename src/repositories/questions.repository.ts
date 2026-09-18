@@ -1,4 +1,4 @@
-import { collection, doc, getDoc, getDocs, addDoc, updateDoc, query, orderBy, writeBatch } from 'firebase/firestore'
+import { collection, doc, getDoc, getDocs, addDoc, updateDoc, query, where, orderBy, writeBatch } from 'firebase/firestore'
 import type { Question } from '../types/schema'
 import { requireDb, withId } from './_firestore'
 import * as optionsRepository from './options.repository'
@@ -13,9 +13,14 @@ export async function getQuestions(pollId: string): Promise<Question[]> {
   return snap.docs.map((d) => withId<Omit<Question, 'id'>>(d))
 }
 
+// Used by the public poll flow (anonymous, non-admin). Issues its own
+// filtered query rather than delegating to getQuestions() + a client-side
+// filter — see the comment on polls.repository.ts's getPollBySlug for why
+// an explicit `where('status', ...)` clause is required for a non-admin
+// list query to be allowed at all, not just for correctness.
 export async function getPublishedQuestions(pollId: string): Promise<Question[]> {
-  const all = await getQuestions(pollId)
-  return all.filter((q) => q.status === 'published')
+  const snap = await getDocs(query(questionsCollection(pollId), where('status', '==', 'published'), orderBy('order')))
+  return snap.docs.map((d) => withId<Omit<Question, 'id'>>(d))
 }
 
 export async function getQuestion(pollId: string, questionId: string): Promise<Question | undefined> {

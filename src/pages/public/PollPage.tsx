@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import type { AnswerValue } from '../../types/schema'
 import { usePollBundle } from '../../hooks/usePollBundle'
 import { useSession } from '../../hooks/useSession'
+import { useAuthState } from '../../app/providers/AuthProvider'
 import * as responsesRepository from '../../repositories/responses.repository'
 import * as statsRepository from '../../repositories/stats.repository'
 import type { OptionResult } from '../../repositories/stats.repository'
@@ -15,7 +16,8 @@ type FlowPhase = 'landing' | 'flow' | 'results' | 'complete'
 
 export function PollPage() {
   const { slug } = useParams<{ slug: string }>()
-  const bundleState = usePollBundle(slug)
+  const { isAdmin } = useAuthState()
+  const bundleState = usePollBundle(slug, isAdmin)
   const session = useSession()
 
   const [phase, setPhase] = useState<FlowPhase>('landing')
@@ -35,10 +37,15 @@ export function PollPage() {
     return <CenteredMessage text="This poll isn't available right now. Please try again shortly." />
   }
 
+  if (!session) {
+    return <CenteredMessage text="Loading poll…" />
+  }
+
+  const activeSession = session
   const { event, poll, questions, optionsByQuestion } = bundleState.bundle
 
   async function checkAlreadyAnswered(questionId: string) {
-    return responsesRepository.hasResponded(session.sessionId, poll.id, questionId)
+    return responsesRepository.hasResponded(activeSession.sessionId, poll.id, questionId)
   }
 
   async function startPoll() {
@@ -66,9 +73,9 @@ export function PollPage() {
     await responsesRepository.submitAnswer({
       pollId: poll.id,
       questionId,
-      sessionId: session.sessionId,
-      source: session.source,
-      userId: session.userId,
+      sessionId: activeSession.sessionId,
+      source: activeSession.source,
+      userId: activeSession.userId,
       value,
     })
     await advance()
