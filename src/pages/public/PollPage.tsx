@@ -31,6 +31,10 @@ export function PollPage() {
     return <CenteredMessage text="This poll could not be found." />
   }
 
+  if (bundleState.status === 'not-configured') {
+    return <CenteredMessage text="This poll isn't available right now. Please try again shortly." />
+  }
+
   const { event, poll, questions, optionsByQuestion } = bundleState.bundle
 
   async function checkAlreadyAnswered(questionId: string) {
@@ -48,7 +52,7 @@ export function PollPage() {
     const nextIndex = currentIndex + 1
     if (nextIndex >= questions.length) {
       const headline = questions.find((q) => q.settings.resultsVisible) ?? questions[0]
-      const res = headline ? await statsRepository.getOptionResults(headline.id) : []
+      const res = headline ? await statsRepository.getOptionResults(poll.id, headline.id) : []
       setResults(res)
       setPhase('results')
       return

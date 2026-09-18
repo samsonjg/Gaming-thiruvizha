@@ -1,29 +1,17 @@
-import { resetAllData } from '../../repositories'
-import { PageHeader, Card, Button } from '../../components/ui'
+import { PageHeader, Card } from '../../components/ui'
 
+// [TBD] No admin-configurable settings exist yet in the approved product
+// (see docs/PRD.md §6). This page is a placeholder so the nav item has
+// somewhere to go — add real settings here as they're specified, rather
+// than inventing configuration options.
 export function Settings() {
-  function handleReset() {
-    if (!confirm('Reset all demo data back to the seeded defaults? This clears any changes made in this browser.')) return
-    resetAllData()
-    window.location.reload()
-  }
-
   return (
     <div className="flex flex-col">
-      <PageHeader title="Settings" subtitle="Prototype configuration" />
+      <PageHeader title="Settings" subtitle="Platform configuration" />
 
       <div className="max-w-xl px-8 py-6">
-        <Card className="flex flex-col gap-3">
-          <div>
-            <p className="font-semibold text-admin-text">Demo Data</p>
-            <p className="text-sm text-admin-muted">
-              This prototype stores everything in your browser's local storage. Reset it to restore the seeded
-              Gaming Thiruvizha event, poll, questions and mock responses.
-            </p>
-          </div>
-          <Button variant="danger" className="self-start" onClick={handleReset}>
-            Reset Demo Data
-          </Button>
+        <Card>
+          <p className="text-sm text-admin-muted">No configurable settings yet.</p>
         </Card>
       </div>
     </div>

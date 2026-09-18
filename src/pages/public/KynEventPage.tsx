@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { GT_POLL_SLUG } from '../../data/seed'
+import { GT_POLL_SLUG } from '../../constants/demoIds'
 
 // Stand-in for the real Kyn event detail page, just enough to demonstrate
 // the "Participate in Poll" integration hook (section 18/29 of the brief).

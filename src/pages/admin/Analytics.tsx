@@ -1,41 +1,53 @@
 import { useEffect, useState } from 'react'
 import * as statsRepository from '../../repositories/stats.repository'
-import type { PollAnalytics, OptionResult } from '../../repositories/stats.repository'
-import { GT_POLL_ID, seedQuestions } from '../../data/seed'
-import { PageHeader, Card, MetricCard } from '../../components/ui'
+import type { OptionResult } from '../../repositories/stats.repository'
+import { useActivePoll } from '../../hooks/usePolls'
+import { usePollAnalytics } from '../../hooks/useAnalytics'
+import { useQuestions } from '../../hooks/useQuestions'
+import { PageHeader, Card, MetricCard, LoadingState, EmptyState } from '../../components/ui'
 import { AnimatedCounter } from '../../components/common/AnimatedCounter'
 import { ResultBar } from '../../components/common/ResultBar'
 
 export function Analytics() {
-  const [analytics, setAnalytics] = useState<PollAnalytics | null>(null)
+  const { data: poll, loading: pollLoading } = useActivePoll()
+  const { data: analytics } = usePollAnalytics(poll?.id)
+  const { data: questions } = useQuestions(poll?.id)
   const [ratingStats, setRatingStats] = useState<{ average: number; count: number; distribution: Record<number, number> } | null>(null)
   const [optionResults, setOptionResults] = useState<Record<string, OptionResult[]>>({})
 
+  const ratingQuestion = questions?.find((q) => q.type === 'rating')
+  const optionQuestions = questions?.filter((q) => q.type === 'single_choice' || q.type === 'multiple_choice') ?? []
+
   useEffect(() => {
-    statsRepository.getPollAnalytics(GT_POLL_ID).then(setAnalytics)
-    statsRepository.getRatingAverage('q3-excitement-rating').then(setRatingStats)
+    if (!poll || !ratingQuestion) return
+    statsRepository.getRatingAverage(poll.id, ratingQuestion.id).then(setRatingStats)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [poll?.id, ratingQuestion?.id])
 
-    const optionQuestions = seedQuestions.filter((q) => q.type === 'single_choice' || q.type === 'multiple_choice')
-    Promise.all(optionQuestions.map((q) => statsRepository.getOptionResults(q.id).then((r) => [q.id, r] as const))).then((entries) => {
-      setOptionResults(Object.fromEntries(entries))
-    })
-  }, [])
+  useEffect(() => {
+    if (!poll || optionQuestions.length === 0) return
+    Promise.all(optionQuestions.map((q) => statsRepository.getOptionResults(poll.id, q.id).then((r) => [q.id, r] as const))).then(
+      (entries) => setOptionResults(Object.fromEntries(entries)),
+    )
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [poll?.id, optionQuestions.map((q) => q.id).join(',')])
 
-  if (!analytics) return null
+  if (pollLoading) return <LoadingState />
+  if (!poll) return <EmptyState title="No poll yet" description="Create an event and poll to see analytics here." />
+  if (!analytics) return <LoadingState />
 
-  const uniqueSessions = analytics.participants
   const mostSelected = Object.values(optionResults)
     .flat()
     .sort((a, b) => b.count - a.count)[0]
 
   return (
     <div className="flex flex-col">
-      <PageHeader title="Analytics" subtitle="Gaming Thiruvizha Audience Poll — full breakdown" />
+      <PageHeader title="Analytics" subtitle={`${poll.name} — full breakdown`} />
 
       <div className="flex flex-col gap-6 px-8 py-6">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           <MetricCard label="Total Participants" value={<AnimatedCounter value={analytics.participants} />} />
-          <MetricCard label="Unique Respondents" value={<AnimatedCounter value={uniqueSessions} />} />
+          <MetricCard label="Unique Respondents" value={<AnimatedCounter value={analytics.participants} />} />
           <MetricCard label="Total Responses" value={<AnimatedCounter value={analytics.totalResponses} />} />
           <MetricCard label="Completion Rate" value={<AnimatedCounter value={analytics.completionRate} suffix="%" />} />
           <MetricCard label="Average Rating" value={ratingStats ? `${ratingStats.average.toFixed(1)} / 5` : '—'} />
@@ -66,9 +78,9 @@ export function Analytics() {
             </div>
           </Card>
 
-          {ratingStats && (
+          {ratingStats && ratingQuestion && (
             <Card>
-              <p className="mb-4 text-sm font-semibold text-admin-text">Rating Distribution — Q3</p>
+              <p className="mb-4 text-sm font-semibold text-admin-text">Rating Distribution — {ratingQuestion.title}</p>
               <div className="flex flex-col gap-2">
                 {[5, 4, 3, 2, 1].map((n) => {
                   const count = ratingStats.distribution[n] ?? 0
@@ -80,7 +92,7 @@ export function Analytics() {
           )}
 
           {Object.entries(optionResults).map(([questionId, results]) => {
-            const q = seedQuestions.find((sq) => sq.id === questionId)
+            const q = questions?.find((sq) => sq.id === questionId)
             return (
               <Card key={questionId}>
                 <p className="mb-4 text-sm font-semibold text-admin-text">Option Distribution — {q?.title}</p>

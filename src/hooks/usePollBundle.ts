@@ -4,6 +4,7 @@ import * as eventsRepository from '../repositories/events.repository'
 import * as pollsRepository from '../repositories/polls.repository'
 import * as questionsRepository from '../repositories/questions.repository'
 import * as optionsRepository from '../repositories/options.repository'
+import { FirebaseNotConfiguredError } from '../repositories/_firestore'
 
 export interface PollBundle {
   event: EventRecord
@@ -15,6 +16,7 @@ export interface PollBundle {
 export type PollBundleState =
   | { status: 'loading' }
   | { status: 'not-found' }
+  | { status: 'not-configured' }
   | { status: 'ready'; bundle: PollBundle }
 
 // Everything the public poll flow needs to render, loaded together: the
@@ -49,7 +51,7 @@ export function usePollBundle(slug: string | undefined): PollBundleState {
       const optionsByQuestion = new Map<string, QuestionOption[]>()
       await Promise.all(
         questions.map(async (q) => {
-          const opts = await optionsRepository.getOptions(q.id)
+          const opts = await optionsRepository.getOptions(poll.id, q.id)
           optionsByQuestion.set(q.id, opts)
         }),
       )
@@ -59,7 +61,18 @@ export function usePollBundle(slug: string | undefined): PollBundleState {
       }
     }
 
-    load()
+    load().catch((err: unknown) => {
+      if (cancelled) return
+      if (err instanceof FirebaseNotConfiguredError) {
+        setState({ status: 'not-configured' })
+      } else {
+        // Unexpected failure (network, permission-denied, …) — treated as
+        // not-found rather than leaking a raw SDK error to a public user.
+        // See docs/SECURITY.md "user-facing error copy".
+        setState({ status: 'not-found' })
+      }
+    })
+
     return () => {
       cancelled = true
     }

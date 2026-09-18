@@ -2,9 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import * as responsesRepository from '../../repositories/responses.repository'
 import * as optionsRepository from '../../repositories/options.repository'
 import type { ResponseRow } from '../../repositories/responses.repository'
-import { GT_POLL_ID } from '../../data/seed'
+import { useActivePoll } from '../../hooks/usePolls'
 import { QUESTION_TYPE_META } from '../../constants/questionTypeMeta'
-import { PageHeader, Card, Select, Button, Badge } from '../../components/ui'
+import { PageHeader, Card, Select, Button, Badge, LoadingState, EmptyState } from '../../components/ui'
 
 function answerSummary(row: ResponseRow, optionLabels: Map<string, string>): string {
   const a = row.answer
@@ -17,6 +17,7 @@ function answerSummary(row: ResponseRow, optionLabels: Map<string, string>): str
 }
 
 export function Responses() {
+  const { data: poll, loading: pollLoading } = useActivePoll()
   const [rows, setRows] = useState<ResponseRow[]>([])
   const [optionLabels, setOptionLabels] = useState<Map<string, string>>(new Map())
   const [questionFilter, setQuestionFilter] = useState('')
@@ -24,15 +25,16 @@ export function Responses() {
   const [typeFilter, setTypeFilter] = useState('')
 
   useEffect(() => {
-    responsesRepository.getResponseRows({ pollId: GT_POLL_ID }).then(async (rows) => {
+    if (!poll) return
+    responsesRepository.getResponseRows({ pollId: poll.id }).then(async (rows) => {
       setRows(rows)
       const questionIds = [...new Set(rows.map((r) => r.response.questionId))]
-      const optionLists = await Promise.all(questionIds.map((id) => optionsRepository.getOptions(id)))
+      const optionLists = await Promise.all(questionIds.map((id) => optionsRepository.getOptions(poll.id, id)))
       const labels = new Map<string, string>()
       optionLists.flat().forEach((o) => labels.set(o.id, o.label))
       setOptionLabels(labels)
     })
-  }, [])
+  }, [poll])
 
   const questions = useMemo(() => {
     const map = new Map<string, string>()
@@ -65,6 +67,9 @@ export function Responses() {
     a.click()
     URL.revokeObjectURL(url)
   }
+
+  if (pollLoading) return <LoadingState />
+  if (!poll) return <EmptyState title="No poll yet" description="Create an event and poll to see responses here." />
 
   return (
     <div className="flex flex-col">

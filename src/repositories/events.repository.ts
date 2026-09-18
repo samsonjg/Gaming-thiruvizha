@@ -1,35 +1,34 @@
-import { v4 as uuid } from 'uuid'
+import { collection, deleteDoc, doc, getDoc, getDocs, addDoc, updateDoc } from 'firebase/firestore'
 import type { EventRecord } from '../types/schema'
-import { KEYS, read, write, delay } from './_localStorage'
+import { requireDb, withId } from './_firestore'
 
+const COLLECTION = 'events'
+
+// Product Rule: only `published` events are shown to public users — the
+// public read path (docs/USER_FLOWS.md "Event Discovery") filters this
+// client-side today; firestore.rules is the actual enforcement (see
+// docs/SECURITY.md) so this function intentionally returns everything and
+// lets callers filter, matching the admin's need to see drafts too.
 export async function getEvents(): Promise<EventRecord[]> {
-  return delay(read<EventRecord>(KEYS.events))
+  const snap = await getDocs(collection(requireDb(), COLLECTION))
+  return snap.docs.map((d) => withId<Omit<EventRecord, 'id'>>(d))
 }
 
 export async function getEvent(id: string): Promise<EventRecord | undefined> {
-  return delay(read<EventRecord>(KEYS.events).find((e) => e.id === id))
+  const snap = await getDoc(doc(requireDb(), COLLECTION, id))
+  return snap.exists() ? withId<Omit<EventRecord, 'id'>>(snap) : undefined
 }
 
 export async function createEvent(input: Omit<EventRecord, 'id'>): Promise<EventRecord> {
-  const events = read<EventRecord>(KEYS.events)
-  const event: EventRecord = { ...input, id: `evt-${uuid()}` }
-  write(KEYS.events, [...events, event])
-  return delay(event)
+  const ref = await addDoc(collection(requireDb(), COLLECTION), input)
+  return { ...input, id: ref.id }
 }
 
 export async function updateEvent(id: string, patch: Partial<EventRecord>): Promise<EventRecord | undefined> {
-  const events = read<EventRecord>(KEYS.events)
-  const idx = events.findIndex((e) => e.id === id)
-  if (idx === -1) return delay(undefined)
-  events[idx] = { ...events[idx], ...patch }
-  write(KEYS.events, events)
-  return delay(events[idx])
+  await updateDoc(doc(requireDb(), COLLECTION, id), patch)
+  return getEvent(id)
 }
 
 export async function deleteEvent(id: string): Promise<void> {
-  write(
-    KEYS.events,
-    read<EventRecord>(KEYS.events).filter((e) => e.id !== id),
-  )
-  return delay(undefined)
+  await deleteDoc(doc(requireDb(), COLLECTION, id))
 }

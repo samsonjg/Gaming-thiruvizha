@@ -9,8 +9,8 @@ import { QuestionRenderer } from '../../features/questions/QuestionRenderer'
 
 export function QuestionPreview() {
   const { pollId, questionId } = useParams<{ pollId: string; questionId: string }>()
-  const { data: question } = useQuestion(questionId)
-  const { data: options } = useOptions(questionId)
+  const { data: question } = useQuestion(pollId, questionId)
+  const { data: options } = useOptions(pollId, questionId)
   const [value, setValue] = useState<AnswerValue | null>(null)
 
   return (

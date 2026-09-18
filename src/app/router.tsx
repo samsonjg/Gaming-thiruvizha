@@ -1,18 +1,33 @@
+import { lazy, Suspense } from 'react'
 import { Routes, Route } from 'react-router-dom'
 import { KynEventPage } from '../pages/public/KynEventPage'
 import { PollPage } from '../pages/public/PollPage'
-import { AdminLayout } from '../components/layout/AdminLayout'
-import { Dashboard } from '../pages/admin/Dashboard'
-import { Events } from '../pages/admin/Events'
-import { EventForm } from '../pages/admin/EventForm'
-import { Polls } from '../pages/admin/Polls'
-import { Questions } from '../pages/admin/Questions'
-import { QuestionBuilder } from '../pages/admin/QuestionBuilder'
-import { QuestionPreview } from '../pages/admin/QuestionPreview'
-import { Responses } from '../pages/admin/Responses'
-import { Analytics } from '../pages/admin/Analytics'
-import { Settings } from '../pages/admin/Settings'
 import { RequireAdmin } from '../features/auth/RequireAdmin'
+import { LoadingState } from '../components/ui'
+
+// Admin is a large, separate audience (internal team, not public poll
+// visitors) — lazy-loaded so public poll visitors never download the
+// admin UI, drag-and-drop reordering, or chart code. See docs/ARCHITECTURE.md
+// "Performance".
+const AdminLayout = lazy(() => import('../components/layout/AdminLayout').then((m) => ({ default: m.AdminLayout })))
+const Dashboard = lazy(() => import('../pages/admin/Dashboard').then((m) => ({ default: m.Dashboard })))
+const Events = lazy(() => import('../pages/admin/Events').then((m) => ({ default: m.Events })))
+const EventForm = lazy(() => import('../pages/admin/EventForm').then((m) => ({ default: m.EventForm })))
+const Polls = lazy(() => import('../pages/admin/Polls').then((m) => ({ default: m.Polls })))
+const Questions = lazy(() => import('../pages/admin/Questions').then((m) => ({ default: m.Questions })))
+const QuestionBuilder = lazy(() => import('../pages/admin/QuestionBuilder').then((m) => ({ default: m.QuestionBuilder })))
+const QuestionPreview = lazy(() => import('../pages/admin/QuestionPreview').then((m) => ({ default: m.QuestionPreview })))
+const Responses = lazy(() => import('../pages/admin/Responses').then((m) => ({ default: m.Responses })))
+const Analytics = lazy(() => import('../pages/admin/Analytics').then((m) => ({ default: m.Analytics })))
+const Settings = lazy(() => import('../pages/admin/Settings').then((m) => ({ default: m.Settings })))
+
+function AdminFallback() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-admin-bg">
+      <LoadingState />
+    </div>
+  )
+}
 
 // Central route tree — see docs/ARCHITECTURE.md "Routing". Public routes
 // need no auth; every /admin/* route is wrapped in RequireAdmin, which
@@ -29,7 +44,9 @@ export function AppRoutes() {
         path="/admin"
         element={
           <RequireAdmin>
-            <AdminLayout />
+            <Suspense fallback={<AdminFallback />}>
+              <AdminLayout />
+            </Suspense>
           </RequireAdmin>
         }
       >

@@ -31,8 +31,8 @@ export function QuestionBuilder() {
   const [showPublish, setShowPublish] = useState(false)
 
   useEffect(() => {
-    if (isNew || !questionId) return
-    questionsRepository.getQuestion(questionId).then(async (q) => {
+    if (isNew || !questionId || !pollId) return
+    questionsRepository.getQuestion(pollId, questionId).then(async (q) => {
       if (!q) return
       setTitle(q.title)
       setDescription(q.description ?? '')
@@ -41,14 +41,14 @@ export function QuestionBuilder() {
       setResultsVisible(q.settings.resultsVisible)
       setRandomizeOptions(q.settings.randomizeOptions)
       setRatingScale(q.settings.ratingScale ?? 5)
-      const opts = await optionsRepository.getOptions(questionId)
+      const opts = await optionsRepository.getOptions(pollId, questionId)
       if (opts.length) {
         setOptions(
           opts.map((o) => ({ id: o.id, label: o.label, emoji: o.emoji ?? '', imageUrl: o.imageUrl ?? '', active: o.active })),
         )
       }
     })
-  }, [questionId, isNew])
+  }, [pollId, questionId, isNew])
 
   const meta = QUESTION_TYPE_META[type]
 
@@ -65,12 +65,13 @@ export function QuestionBuilder() {
   }
 
   async function persist(explicitStatus?: Question['status']): Promise<string | null> {
+    if (!pollId) return null
     setSaving(true)
-    const questions = pollId ? await questionsRepository.getQuestions(pollId) : []
+    const questions = await questionsRepository.getQuestions(pollId)
     const existing = savedId ? questions.find((q) => q.id === savedId) : undefined
     const status: Question['status'] = explicitStatus ?? existing?.status ?? 'draft'
     const payload: Omit<Question, 'id'> = {
-      pollId: pollId!,
+      pollId,
       type,
       title,
       description: description || undefined,
@@ -86,15 +87,16 @@ export function QuestionBuilder() {
 
     let id = savedId
     if (id) {
-      await questionsRepository.updateQuestion(id, payload)
+      await questionsRepository.updateQuestion(pollId, id, payload)
     } else {
-      const created = await questionsRepository.createQuestion(payload)
+      const created = await questionsRepository.createQuestion(pollId, payload)
       id = created.id
       setSavedId(id)
     }
 
     if (meta.hasOptions) {
       await optionsRepository.setOptions(
+        pollId,
         id!,
         options
           .filter((o) => o.label.trim().length > 0)
@@ -122,7 +124,7 @@ export function QuestionBuilder() {
   }
 
   async function confirmPublish() {
-    if (savedId) await questionsRepository.updateQuestion(savedId, { status: 'published' })
+    if (savedId && pollId) await questionsRepository.updateQuestion(pollId, savedId, { status: 'published' })
     setShowPublish(false)
     navigate(`/admin/polls/${pollId}/questions`)
   }

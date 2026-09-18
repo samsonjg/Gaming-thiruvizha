@@ -1,7 +1,9 @@
+import { doc, getDoc } from 'firebase/firestore'
 import type { Question } from '../types/schema'
-import { getOptions } from './options.repository'
-import { getQuestions } from './questions.repository'
-import { getResponseRows } from './responses.repository'
+import { requireDb } from './_firestore'
+import * as optionsRepository from './options.repository'
+import * as questionsRepository from './questions.repository'
+import * as responsesRepository from './responses.repository'
 
 export interface OptionResult {
   optionId: string
@@ -11,40 +13,46 @@ export interface OptionResult {
   pct: number
 }
 
-// [TEMPORARY / NOT PRODUCTION READY] These aggregation functions currently
-// scan raw responses client-side, which is only acceptable because the
-// prototype's localStorage store has no other real users to protect. The
-// Firestore version of this repository must read a public `questionStats`
-// counters document instead of raw responses — see docs/FIREBASE_SCHEMA.md
-// ("Aggregated Results without exposing individual responses").
-export async function getOptionResults(questionId: string): Promise<OptionResult[]> {
-  const options = await getOptions(questionId)
-  const rows = await getResponseRows({ questionId })
-  const counts = new Map<string, number>()
-  let total = 0
+interface QuestionStatsDoc {
+  optionCounts?: Record<string, number>
+  ratingSum?: number
+  ratingCount?: number
+  totalResponses?: number
+  textCount?: number
+}
 
-  for (const row of rows) {
-    for (const optId of row.answer?.optionIds ?? []) {
-      counts.set(optId, (counts.get(optId) ?? 0) + 1)
-      total += 1
-    }
-  }
+// Public-safe aggregate: reads the questionStats counters doc, never the
+// raw responses subcollection. See docs/FIREBASE_SCHEMA.md "Aggregated
+// results without exposing individual responses" — this is what the
+// public poll results screen calls.
+export async function getOptionResults(pollId: string, questionId: string): Promise<OptionResult[]> {
+  const [options, statsSnap] = await Promise.all([
+    optionsRepository.getOptions(pollId, questionId),
+    getDoc(doc(requireDb(), 'polls', pollId, 'questionStats', questionId)),
+  ])
+  const stats = (statsSnap.data() as QuestionStatsDoc | undefined) ?? {}
+  const counts = stats.optionCounts ?? {}
+  const total = Object.values(counts).reduce((a, b) => a + b, 0)
 
   return options
     .map((o) => ({
       optionId: o.id,
       label: o.label,
       emoji: o.emoji,
-      count: counts.get(o.id) ?? 0,
-      pct: total > 0 ? Math.round(((counts.get(o.id) ?? 0) / total) * 1000) / 10 : 0,
+      count: counts[o.id] ?? 0,
+      pct: total > 0 ? Math.round(((counts[o.id] ?? 0) / total) * 1000) / 10 : 0,
     }))
     .sort((a, b) => b.count - a.count)
 }
 
+// Admin-only (used by the Analytics screen, which sits behind RequireAdmin)
+// — reads raw responses for the full 1-5/1-10 distribution, which the
+// public questionStats counters doc doesn't carry.
 export async function getRatingAverage(
+  pollId: string,
   questionId: string,
 ): Promise<{ average: number; count: number; distribution: Record<number, number> }> {
-  const rows = await getResponseRows({ questionId })
+  const rows = await responsesRepository.getResponseRows({ pollId, questionId })
   const values = rows.map((r) => r.answer?.ratingValue).filter((v): v is number => typeof v === 'number')
   const distribution: Record<number, number> = {}
   values.forEach((v) => {
@@ -54,8 +62,8 @@ export async function getRatingAverage(
   return { average, count: values.length, distribution }
 }
 
-export async function getTextAnswers(questionId: string): Promise<string[]> {
-  const rows = await getResponseRows({ questionId })
+export async function getTextAnswers(pollId: string, questionId: string): Promise<string[]> {
+  const rows = await responsesRepository.getResponseRows({ pollId, questionId })
   return rows.map((r) => r.answer?.textValue).filter((v): v is string => Boolean(v))
 }
 
@@ -71,10 +79,13 @@ export interface PollAnalytics {
   questionPerformance: { questionId: string; title: string; responses: number }[]
 }
 
+// Admin-only — reads raw responses (session/source/timestamp granularity
+// that the public counters doc doesn't have). See RequireAdmin on the
+// Dashboard/Analytics routes and firestore.rules for the actual boundary.
 export async function getPollAnalytics(pollId: string): Promise<PollAnalytics> {
-  const questions: Question[] = await getQuestions(pollId)
+  const questions: Question[] = await questionsRepository.getQuestions(pollId)
   const activeQuestions = questions.filter((q) => q.status === 'published')
-  const rows = await getResponseRows({ pollId })
+  const rows = await responsesRepository.getResponseRows({ pollId })
 
   const sessions = new Set(rows.map((r) => r.response.sessionId))
   const participants = sessions.size

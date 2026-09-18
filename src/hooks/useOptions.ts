@@ -1,6 +1,9 @@
 import * as optionsRepository from '../repositories/options.repository'
 import { useAsync } from './useAsync'
 
-export function useOptions(questionId: string | undefined) {
-  return useAsync(() => (questionId ? optionsRepository.getOptions(questionId) : Promise.resolve([])), [questionId])
+export function useOptions(pollId: string | undefined, questionId: string | undefined) {
+  return useAsync(
+    () => (pollId && questionId ? optionsRepository.getOptions(pollId, questionId) : Promise.resolve([])),
+    [pollId, questionId],
+  )
 }

@@ -1,14 +1,21 @@
 import { Link } from 'react-router-dom'
-import { GT_POLL_ID } from '../../data/seed'
+import { useActivePoll } from '../../hooks/usePolls'
 import { usePollAnalytics, useOptionResults } from '../../hooks/useAnalytics'
-import { PageHeader, MetricCard, Card, LoadingState } from '../../components/ui'
+import { useQuestions } from '../../hooks/useQuestions'
+import { PageHeader, MetricCard, Card, LoadingState, EmptyState } from '../../components/ui'
 import { AnimatedCounter } from '../../components/common/AnimatedCounter'
 import { ResultBar } from '../../components/common/ResultBar'
 
 export function Dashboard() {
-  const { data: analytics } = usePollAnalytics(GT_POLL_ID)
-  const { data: topOptions } = useOptionResults('q1-excited')
+  const { data: poll, loading: pollLoading } = useActivePoll()
+  const { data: analytics } = usePollAnalytics(poll?.id)
+  const { data: questions } = useQuestions(poll?.id)
 
+  const headline = questions?.find((q) => q.settings.resultsVisible) ?? questions?.[0]
+  const { data: topOptions } = useOptionResults(poll?.id, headline?.id)
+
+  if (pollLoading) return <LoadingState />
+  if (!poll) return <EmptyState title="No poll yet" description="Create an event and poll to see dashboard metrics here." />
   if (!analytics) return <LoadingState />
 
   const maxFunnel = Math.max(...analytics.funnel.map((f) => f.count), 1)
@@ -16,7 +23,7 @@ export function Dashboard() {
   return (
     <div className="flex flex-col">
       <PageHeader
-        title="Gaming Thiruvizha 2026"
+        title={poll.name}
         subtitle="Audience poll performance overview"
         actions={
           <Link to="/admin/analytics" className="text-sm font-semibold text-admin-primary">
@@ -70,7 +77,9 @@ export function Dashboard() {
           </Card>
 
           <Card>
-            <p className="mb-4 text-sm font-semibold text-admin-text">Most Popular Answers — Q1</p>
+            <p className="mb-4 text-sm font-semibold text-admin-text">
+              Most Popular Answers{headline ? ` — ${headline.title}` : ''}
+            </p>
             <div className="flex flex-col gap-3">
               {(topOptions ?? []).slice(0, 5).map((o, i) => (
                 <ResultBar key={o.optionId} label={o.label} emoji={o.emoji} pct={o.pct} count={o.count} highlight={i === 0} theme="light" />

@@ -1,13 +1,16 @@
-import { v4 as uuid } from 'uuid'
-import type { Question, QuestionOption } from '../types/schema'
-import { KEYS, read, write, delay } from './_localStorage'
+import { collection, doc, getDoc, getDocs, addDoc, updateDoc, query, orderBy, writeBatch } from 'firebase/firestore'
+import type { Question } from '../types/schema'
+import { requireDb, withId } from './_firestore'
+import * as optionsRepository from './options.repository'
+
+// Nested under polls/{pollId}/questions — see docs/FIREBASE_SCHEMA.md.
+function questionsCollection(pollId: string) {
+  return collection(requireDb(), 'polls', pollId, 'questions')
+}
 
 export async function getQuestions(pollId: string): Promise<Question[]> {
-  return delay(
-    read<Question>(KEYS.questions)
-      .filter((q) => q.pollId === pollId)
-      .sort((a, b) => a.order - b.order),
-  )
+  const snap = await getDocs(query(questionsCollection(pollId), orderBy('order')))
+  return snap.docs.map((d) => withId<Omit<Question, 'id'>>(d))
 }
 
 export async function getPublishedQuestions(pollId: string): Promise<Question[]> {
@@ -15,58 +18,53 @@ export async function getPublishedQuestions(pollId: string): Promise<Question[]>
   return all.filter((q) => q.status === 'published')
 }
 
-export async function getQuestion(id: string): Promise<Question | undefined> {
-  return delay(read<Question>(KEYS.questions).find((q) => q.id === id))
+export async function getQuestion(pollId: string, questionId: string): Promise<Question | undefined> {
+  const snap = await getDoc(doc(questionsCollection(pollId), questionId))
+  return snap.exists() ? withId<Omit<Question, 'id'>>(snap) : undefined
 }
 
-export async function createQuestion(input: Omit<Question, 'id'>): Promise<Question> {
-  const questions = read<Question>(KEYS.questions)
-  const question: Question = { ...input, id: `q-${uuid()}` }
-  write(KEYS.questions, [...questions, question])
-  return delay(question)
+export async function createQuestion(pollId: string, input: Omit<Question, 'id'>): Promise<Question> {
+  const ref = await addDoc(questionsCollection(pollId), input)
+  return { ...input, id: ref.id }
 }
 
-export async function updateQuestion(id: string, patch: Partial<Question>): Promise<Question | undefined> {
-  const questions = read<Question>(KEYS.questions)
-  const idx = questions.findIndex((q) => q.id === id)
-  if (idx === -1) return delay(undefined)
-  questions[idx] = { ...questions[idx], ...patch }
-  write(KEYS.questions, questions)
-  return delay(questions[idx])
+export async function updateQuestion(pollId: string, questionId: string, patch: Partial<Question>): Promise<Question | undefined> {
+  await updateDoc(doc(questionsCollection(pollId), questionId), patch)
+  return getQuestion(pollId, questionId)
 }
 
-export async function deleteQuestion(id: string): Promise<void> {
-  write(KEYS.questions, read<Question>(KEYS.questions).filter((q) => q.id !== id))
-  write(KEYS.options, read<QuestionOption>(KEYS.options).filter((o) => o.questionId !== id))
-  return delay(undefined)
+export async function deleteQuestion(pollId: string, questionId: string): Promise<void> {
+  const options = await optionsRepository.getOptions(pollId, questionId)
+  const b = writeBatch(requireDb())
+  options.forEach((o) => b.delete(doc(questionsCollection(pollId), questionId, 'options', o.id)))
+  b.delete(doc(questionsCollection(pollId), questionId))
+  await b.commit()
 }
 
-export async function duplicateQuestion(id: string): Promise<Question | undefined> {
-  const source = await getQuestion(id)
-  if (!source) return delay(undefined)
-  const siblingCount = (await getQuestions(source.pollId)).length
-  const newQuestion: Question = {
+export async function duplicateQuestion(pollId: string, questionId: string): Promise<Question | undefined> {
+  const source = await getQuestion(pollId, questionId)
+  if (!source) return undefined
+  const siblingCount = (await getQuestions(pollId)).length
+
+  const newQuestion = await createQuestion(pollId, {
     ...source,
-    id: `q-${uuid()}`,
     title: `${source.title} (Copy)`,
     status: 'draft',
     order: siblingCount + 1,
+  })
+
+  const options = await optionsRepository.getOptions(pollId, questionId)
+  if (options.length) {
+    await optionsRepository.setOptions(pollId, newQuestion.id, options)
   }
-  write(KEYS.questions, [...read<Question>(KEYS.questions), newQuestion])
 
-  const options = read<QuestionOption>(KEYS.options).filter((o) => o.questionId === id)
-  const newOptions = options.map((o) => ({ ...o, id: `opt-${uuid()}`, questionId: newQuestion.id }))
-  write(KEYS.options, [...read<QuestionOption>(KEYS.options), ...newOptions])
-
-  return delay(newQuestion)
+  return newQuestion
 }
 
 export async function reorderQuestions(pollId: string, orderedIds: string[]): Promise<void> {
-  const questions = read<Question>(KEYS.questions)
+  const b = writeBatch(requireDb())
   orderedIds.forEach((id, idx) => {
-    const q = questions.find((x) => x.id === id && x.pollId === pollId)
-    if (q) q.order = idx + 1
+    b.update(doc(questionsCollection(pollId), id), { order: idx + 1 })
   })
-  write(KEYS.questions, questions)
-  return delay(undefined)
+  await b.commit()
 }

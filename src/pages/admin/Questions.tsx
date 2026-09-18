@@ -62,19 +62,22 @@ export function Questions() {
   }
 
   async function duplicate(id: string) {
-    await questionsRepository.duplicateQuestion(id)
+    if (!pollId) return
+    await questionsRepository.duplicateQuestion(pollId, id)
     load()
   }
 
   async function remove(id: string) {
+    if (!pollId) return
     if (!confirm('Delete this question? This cannot be undone.')) return
-    await questionsRepository.deleteQuestion(id)
+    await questionsRepository.deleteQuestion(pollId, id)
     load()
   }
 
   async function toggleStatus(q: Question) {
+    if (!pollId) return
     if (q.status === 'published') {
-      await questionsRepository.updateQuestion(q.id, { status: 'unpublished' })
+      await questionsRepository.updateQuestion(pollId, q.id, { status: 'unpublished' })
       load()
     } else {
       setPublishTarget(q)
@@ -82,8 +85,8 @@ export function Questions() {
   }
 
   async function confirmPublish() {
-    if (!publishTarget) return
-    await questionsRepository.updateQuestion(publishTarget.id, { status: 'published' })
+    if (!publishTarget || !pollId) return
+    await questionsRepository.updateQuestion(pollId, publishTarget.id, { status: 'published' })
     setPublishTarget(null)
     load()
   }
