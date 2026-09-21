@@ -69,11 +69,20 @@ export async function submitAnswer(input: SubmitAnswerInput): Promise<SubmitAnsw
   const b = writeBatch(requireDb())
   b.set(doc(responsesCollection(input.pollId), id), { ...response, answer })
 
+  // IMPORTANT: `set(ref, data, { merge: true })` only merges *nested plain
+  // objects* recursively — a key containing a literal dot, e.g.
+  // `{ 'optionCounts.abc': increment(1) }`, is NOT parsed as a field path
+  // the way it would be with `updateDoc()`. It's written as one literal
+  // top-level field named "optionCounts.abc", which is invisible to any
+  // read expecting a nested `optionCounts` map. Must build a real nested
+  // object instead. (This was a real production bug — see docs/CHANGELOG.md.)
   const statsPatch: Record<string, unknown> = { totalResponses: increment(1) }
   if (input.value.kind === 'options') {
+    const optionCounts: Record<string, unknown> = {}
     input.value.optionIds.forEach((optId) => {
-      statsPatch[`optionCounts.${optId}`] = increment(1)
+      optionCounts[optId] = increment(1)
     })
+    statsPatch.optionCounts = optionCounts
   } else if (input.value.kind === 'rating') {
     statsPatch.ratingSum = increment(input.value.rating)
     statsPatch.ratingCount = increment(1)

@@ -120,7 +120,7 @@ adminUsers/{uid}
 | answer.ratingValue | number | no | For `rating` |
 | answer.rankingOrder | string[] | no | For `ranking` |
 
-**Who can read:** Admins only (`get`/`list`).
+**Who can read:** Admins can `get`/`list` any response. A signed-in user can `get` (never `list`) only their own response doc — the one whose id starts with their own uid — which is what the public "already answered?" check needs. Nobody can enumerate/browse other users' responses.
 **Who can create:** A signed-in user, writing only their own doc id, only for the `pollId` in the path. See `firestore.rules` for the exact condition.
 **Who can update/delete:** Nobody — not even admins, via the client. See `firestore.rules` comment for why (no audit trail yet).
 

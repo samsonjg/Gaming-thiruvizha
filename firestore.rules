@@ -56,7 +56,15 @@ service cloud.firestore {
       // here: a second write to the same id is an *update*, which is
       // disallowed below, not a second *create*.
       match /responses/{responseId} {
-        allow get: if isAdmin();
+        // A user may `get` only their own response doc (they can only
+        // construct that exact id if they already know their own uid) —
+        // this is what powers the "already answered?" check before
+        // showing the duplicate-answer guard (PollPage.tsx) and inside
+        // submitAnswer() itself. Bulk enumeration (`list`) of the
+        // responses collection — browsing/exporting everyone's answers —
+        // stays admin-only; a user can never list, only address a single
+        // doc they already know the id of.
+        allow get: if isAdmin() || (isSignedIn() && responseId.split('_')[0] == request.auth.uid);
         allow list: if isAdmin();
 
         allow create: if isSignedIn()
