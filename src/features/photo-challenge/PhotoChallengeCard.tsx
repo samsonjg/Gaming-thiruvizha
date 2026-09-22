@@ -11,7 +11,7 @@ export function PhotoChallengeCard({ challenge }: { challenge: PhotoChallenge })
       <div className="flex flex-col gap-3 p-5">
         <div className="flex items-center gap-2">
           <span className="text-2xl">📸</span>
-          <p className="text-xs font-bold uppercase tracking-widest text-gt-gold-400">Photo Challenge</p>
+          <p className="text-xs font-bold uppercase tracking-widest text-gt-gold-400">Snap Hunt</p>
         </div>
         <h2 className="text-xl font-bold text-white">{challenge.title}</h2>
         <p className="text-sm text-white/70">{challenge.question}</p>

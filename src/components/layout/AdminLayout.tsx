@@ -6,7 +6,7 @@ const NAV_ITEMS = [
   { to: '/admin/polls', label: 'Polls', icon: '📋' },
   { to: '/admin/responses', label: 'Responses', icon: '🗂️' },
   { to: '/admin/analytics', label: 'Analytics', icon: '📈' },
-  { to: '/admin/photo-challenge/config', label: 'Photo Challenge', icon: '📸' },
+  { to: '/admin/photo-challenge/config', label: 'Snap Hunt', icon: '📸' },
   { to: '/admin/settings', label: 'Settings', icon: '⚙️' },
 ]
 

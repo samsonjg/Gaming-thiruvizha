@@ -69,13 +69,13 @@ export function PhotoChallengeConfig() {
 
   return (
     <div className="flex flex-col">
-      <PageHeader title="Photo Challenge" subtitle="Configure the current challenge" />
+      <PageHeader title="Snap Hunt" subtitle="Configure the current challenge" />
       <PhotoChallengeTabs />
 
       <div className="max-w-2xl px-8 py-6">
         <Card className="flex flex-col gap-4">
           <Field label="Title">
-            <Input value={form.title} onChange={(e) => update('title', e.target.value)} placeholder="Cosplay Photo Challenge" />
+            <Input value={form.title} onChange={(e) => update('title', e.target.value)} placeholder="Cosplay Snap Hunt" />
           </Field>
 
           <Field label="Challenge Question">

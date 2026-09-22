@@ -64,13 +64,13 @@ export function PhotoChallengePage() {
         {(challengeLoading || submissionLoading) && !challenge && <CenteredMessage text="Loading…" />}
 
         {!challengeLoading && (challengeError || !challenge) && (
-          <CenteredMessage text="No active Photo Challenge right now. Check back soon!" onRetry={reload} />
+          <CenteredMessage text="No active Snap Hunt right now. Check back soon!" onRetry={reload} />
         )}
 
         {challenge && (
           <>
             <div>
-              <p className="text-xs font-bold uppercase tracking-widest text-gt-gold-400">📸 Photo Challenge</p>
+              <p className="text-xs font-bold uppercase tracking-widest text-gt-gold-400">📸 Snap Hunt</p>
               <h1 className="mt-1 text-3xl font-extrabold">{challenge.title}</h1>
               <p className="mt-2 text-sm text-white/70">{challenge.description}</p>
               {challenge.rewardPoints > 0 && (
@@ -81,7 +81,7 @@ export function PhotoChallengePage() {
             </div>
 
             {isEnded ? (
-              <CenteredMessage text="This Photo Challenge has ended." />
+              <CenteredMessage text="This Snap Hunt has ended." />
             ) : !session || submissionLoading ? (
               <CenteredMessage text="Loading…" />
             ) : submission && !changingPhoto ? (

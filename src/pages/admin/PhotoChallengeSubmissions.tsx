@@ -38,11 +38,11 @@ export function PhotoChallengeSubmissions() {
   }
 
   if (challengeLoading) return <LoadingState />
-  if (!challenge) return <EmptyState title="No challenge configured" description="Create a Photo Challenge in Configuration first." />
+  if (!challenge) return <EmptyState title="No challenge configured" description="Create a Snap Hunt in Configuration first." />
 
   return (
     <div className="flex flex-col">
-      <PageHeader title="Photo Challenge" subtitle={`${submissions?.length ?? 0} submissions`} />
+      <PageHeader title="Snap Hunt" subtitle={`${submissions?.length ?? 0} submissions`} />
       <PhotoChallengeTabs />
 
       <div className="px-8 py-6">

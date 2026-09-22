@@ -7,7 +7,7 @@ export function PhotoChallengeAnalytics() {
   const { data: submissions, loading } = useSubmissions(challenge?.id)
 
   if (challengeLoading || loading) return <LoadingState />
-  if (!challenge) return <EmptyState title="No challenge configured" description="Create a Photo Challenge in Configuration first." />
+  if (!challenge) return <EmptyState title="No challenge configured" description="Create a Snap Hunt in Configuration first." />
 
   const total = submissions?.length ?? 0
   const pending = submissions?.filter((s) => s.status === 'pending').length ?? 0
@@ -17,7 +17,7 @@ export function PhotoChallengeAnalytics() {
 
   return (
     <div className="flex flex-col">
-      <PageHeader title="Photo Challenge" subtitle="Submission analytics" />
+      <PageHeader title="Snap Hunt" subtitle="Submission analytics" />
       <PhotoChallengeTabs />
 
       <div className="flex flex-col gap-6 px-8 py-6">
