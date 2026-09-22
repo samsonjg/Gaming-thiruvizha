@@ -2,6 +2,11 @@
 
 Every meaningful product or architecture change gets an entry here — see `AI_CONTEXT.md` do-not-break rule #8. Group by date, using `### Added` / `### Changed` / `### Fixed` / `### Database` / `### Security` as needed (omit sections with nothing to say).
 
+## 2026-09-22
+
+### Added
+- `scripts/add-admin.cjs` — creates a Firebase Auth account with a temporary password and grants the `admin` custom claim in one step, for provisioning additional admins. Deliberately kept as a local script rather than an in-app "add admin" UI: that would require a Cloud Function (custom claims and creating other users' accounts are Admin-SDK-only, server-side-only operations), which would force the project off the free Spark plan onto Blaze — not worth it for provisioning a handful of internal accounts. See `docs/ADMIN_PANEL.md`.
+
 ## 2026-09-18
 
 ### Added
