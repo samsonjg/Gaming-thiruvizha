@@ -116,3 +116,65 @@ export interface QuestionTypeMeta {
   hasOptions: boolean
   supportsMultiple: boolean
 }
+
+// ---------------- Photo Challenge ----------------
+// A second, independent engagement module alongside the Poll — see
+// docs/PRD.md "Photo Challenge" and docs/FIREBASE_SCHEMA.md. Nothing here
+// is referenced by any Poll type above; the two features share only the
+// Firebase project, the admin shell, and the UI kit.
+
+export type PhotoChallengeStatus = 'draft' | 'active' | 'inactive'
+export type SubmissionStatus = 'pending' | 'approved' | 'rejected'
+
+export interface PhotoChallenge {
+  id: string
+  title: string
+  question: string
+  description: string
+  rewardPoints: number
+  status: PhotoChallengeStatus
+  startAt: string // ISO date
+  endAt: string // ISO date
+  maxPhotos: number
+  allowedPhotoChanges: number
+  maxFileSizeBytes: number
+  allowedFileTypes: string[] // MIME types, e.g. 'image/jpeg'
+  termsContent: string
+  termsVersion: string
+  aiDeclarationText: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface PhotoSubmission {
+  id: string // == userId
+  challengeId: string
+  userId: string
+  imageUrl: string
+  storagePath: string
+  fileName: string
+  fileSize: number
+  contentType: string
+  status: SubmissionStatus
+  photoChangeCount: number
+  termsAccepted: boolean
+  termsAcceptedAt: string
+  termsVersion: string
+  realPhotoConfirmed: boolean
+  realPhotoConfirmedAt: string
+  submittedAt: string
+  updatedAt: string
+  rejectionReason?: string
+  rejectedBy?: string
+  rejectedAt?: string
+  approvedBy?: string
+  approvedAt?: string
+}
+
+// Public-safe denormalization of an approved submission — the only shape
+// the public gallery ever reads. See FIREBASE_SCHEMA.md "gallery".
+export interface PhotoGalleryItem {
+  id: string
+  imageUrl: string
+  submittedAt: string
+}

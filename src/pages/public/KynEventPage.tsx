@@ -1,9 +1,13 @@
 import { Link } from 'react-router-dom'
 import { GT_POLL_SLUG } from '../../constants/demoIds'
+import { useActiveChallenge } from '../../hooks/usePhotoChallenge'
+import { PhotoChallengeCard } from '../../features/photo-challenge/PhotoChallengeCard'
 
 // Stand-in for the real Kyn event detail page, just enough to demonstrate
 // the "Participate in Poll" integration hook (section 18/29 of the brief).
 export function KynEventPage() {
+  const { data: challenge } = useActiveChallenge()
+
   return (
     <div className="min-h-screen bg-gt-purple-950 text-white [background:radial-gradient(120%_120%_at_50%_0%,#2a1458_0%,#150a2e_55%,#0d0620_100%)]">
       <div className="mx-auto flex min-h-screen w-full max-w-md flex-col px-5 py-8">
@@ -34,6 +38,8 @@ export function KynEventPage() {
             </Link>
           </div>
         </div>
+
+        {challenge && <PhotoChallengeCard challenge={challenge} />}
 
         <p className="mt-6 text-center text-xs text-white/30">Kyn Event Poll & Engagement Platform — demo entry point</p>
       </div>

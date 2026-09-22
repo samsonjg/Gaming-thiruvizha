@@ -37,6 +37,23 @@ Log the real error for debugging (console in dev; see `DEVELOPMENT.md`) but neve
 
 Admin forms validate required fields today (a question needs a title to save). Length limits, character restrictions, and option-count minimums are `[TBD]` — see `FEATURES.md` "Question Builder" validation rules and `PRD.md` §6. Client-side validation is a UX nicety; it is never a substitute for what `firestore.rules` allows to be written, and rules should eventually validate document shape too (`[TBD]`, not yet implemented — rules today check *who* can write, not *what* they write, beyond the response doc's id/field-matching checks in `firestore.rules`).
 
+## Photo Challenge — one photo change, enforced server-side
+
+The product requirement ("ONE PHOTO CHANGE ONLY") is enforced by `firestore.rules`, not React state — a malicious client cannot reset `photoChangeCount` from the browser. A user's self-`update` on their own `submissions/{uid}` doc is allowed only if:
+- the new `photoChangeCount` is exactly `resource.data.photoChangeCount + 1` (never backward, never a jump),
+- the *current* `photoChangeCount` is still below the parent challenge's `allowedPhotoChanges` (read via a cross-document `get()` on `photoChallenges/{challengeId}`, the same pattern `options` already uses to check its parent question's `status`),
+- `status`, `rejectionReason`, `approvedBy`, `rejectedBy`, and `userId` are all unchanged.
+
+Admins can update unrestricted (moderation: `status`, `rejectionReason`, etc.). See `FIREBASE_SCHEMA.md`'s `submissions` entry and `firestore.rules` for the exact condition.
+
+## Photo Challenge — Storage
+
+A Firebase Storage download URL carries its own bearer token and stays fetchable once issued, regardless of `storage.rules` — that property is what lets the public Community Gallery show approved photos by URL without granting `allow read: if true` on Storage itself. `storage.rules` gates the SDK/enumeration path only: a given `photoChallenges/{challengeId}/{userId}/...` path is readable/writable/deletable only by its owning `userId` or an admin, with a content-type allowlist (`image/jpeg|png|webp`) and a 10MB hard ceiling as defense-in-depth (the real UX-facing size limit is the admin-configured `maxFileSizeBytes`, enforced client-side).
+
+## Photo Challenge — no AI-detection API, declaration-based only
+
+Per the product decision, there is no external AI-image-detection service call anywhere in this flow. "Not AI-generated" is a user declaration (`realPhotoConfirmed`, gating the Submit button) plus Terms & Conditions acceptance plus admin moderation (Approve/Reject with a reason) — the same trust model already used for admin-moderated content elsewhere in this app. If abuse is observed, the fix is better admin moderation UX, not a bolted-on detection API.
+
 ## Firebase web config is not a secret
 
 The `VITE_FIREBASE_*` values in `.env.local` (API key, project id, etc.) are safe to ship to the browser — this is standard for Firebase web apps and is explicitly by design; real authorization is `firestore.rules`, not obscurity of this config. Do not confuse this with the Admin SDK service account key used once in `ADMIN_PANEL.md`'s bootstrap script, which **is** a real secret and must never be committed.

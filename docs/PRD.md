@@ -54,6 +54,23 @@ Status: Living document. Source of truth for product behavior. Update this file 
 | Analytics | Understand poll performance and traffic source mix | Admin | `/admin/analytics` | Participants, unique respondents, total responses, completion rate, average rating, most selected option, Kyn vs external split, completion funnel, rating distribution, per-question option distribution | Aggregated `Response`/`ResponseAnswer` data | Numbers match underlying data | No data yet → zeros | N/A | None | Implemented |
 | Kyn Traffic Attribution | Distinguish Kyn app traffic from externally shared links | System | Poll URL query params | `?source=kyn` (or `external`), plus `utm_source`/`utm_medium`/`utm_campaign`/`campaign`/`user_id`/`event_id` captured into the session and stamped on every response | URL query params | `source` correctly recorded on every response from that session | Missing params → defaults to `external` | Visible in admin Analytics as Kyn vs External % | None (attribution is passive) | Implemented |
 
+### 3a. Photo Challenge (extension module)
+
+A second, independent engagement activity alongside the Poll — not a replacement, not a second app, not a second admin panel. Same Firebase project, same admin authorization, same `UI → hooks → repositories → Firebase` architecture. See `FIREBASE_SCHEMA.md` and `SECURITY.md` for the technical detail.
+
+| Feature | Purpose | User | Entry Point | Expected Behaviour | Data Required | Success Condition | Failure Condition | Admin Dependency | Analytics Events | Status |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Photo Challenge Card | Surface the challenge from the Kyn event page | Public | `/` (alongside the existing "Participate in Poll" card, not replacing it) | Shows title, question, reward points, "Upload Photo" CTA — only rendered if an `active` challenge exists | Active `PhotoChallenge` | User reaches `/photo-challenge` | No active challenge → card simply doesn't render | Admin must set `status: 'active'` | `photo_challenge_viewed` | Implemented |
+| Photo Upload Flow | Submit a photo for the challenge | Public | `/photo-challenge` | Select → validate (type/size) → client-side compress if needed → preview → "not AI-generated" checkbox → Terms & Conditions checkbox → Submit (disabled until both checked) | Active `PhotoChallenge`; one file | `PhotoSubmission` created, status `pending` | Invalid type/size → inline error; upload failure → inline error, retry possible | Admin configures allowed types/max size/terms/AI-declaration text | `photo_upload_started`, `photo_selected`, `photo_submission_started`, `photo_submission_success`, `photo_submission_failed` | Implemented |
+| My Submission Status | Let a user see their own submission state | Public | `/photo-challenge`, after submitting | Shows photo, status badge (Pending/Approved/Rejected), submitted date, rejection reason if rejected, changes remaining, "Change Photo" if any remain | Own `PhotoSubmission` | User understands current state | N/A | N/A | None | Implemented |
+| Change Photo (the one allowed replacement) | Let a user replace their photo exactly once | Public | "Change Photo" on the status screen | Same upload flow as initial submit; after the one allowed change, "Change Photo" is replaced with a locked message | Own `PhotoSubmission`, `allowedPhotoChanges` on the challenge | `photoChangeCount` increments by exactly 1 | A second attempt beyond the limit is rejected — client hides the button, **and** `firestore.rules` independently refuses the write (see `SECURITY.md`) | Admin sets `allowedPhotoChanges` (default 1) | `photo_change_started`, `photo_change_completed` | Implemented |
+| Community Gallery | Show approved submissions publicly | Public | `/photo-challenge`, below the upload/status area | Paginated grid ("Load more", not infinite scroll or realtime), approved photos only, no uploader identity shown | `photoChallenges/{id}/gallery` (public-safe denormalization) | Grid renders, paginates without loading everything at once | No approved photos yet → empty state | Admin approving a submission is what populates this | `photo_gallery_viewed` | Implemented |
+| Photo Challenge Configuration | Configure the (singleton) current challenge | Admin | `/admin/photo-challenge/config` | Single form: title, question, description, reward points, status, dates, max photos, allowed photo changes, max file size, allowed file types, Terms & Conditions + version, AI declaration text | `PhotoChallenge` | Saved challenge reflected publicly once `active` | Missing title/question blocks save | N/A | None | Implemented |
+| Photo Challenge Submissions | Moderate submissions | Admin | `/admin/photo-challenge/submissions` | Table (User/Photo/Submitted/Status/Changes/Actions), status filter, View/Approve/Reject/Remove; Reject and Remove both require a typed reason | `PhotoSubmission[]` | Status change reflected publicly (approve → appears in gallery; reject → reason shows on the user's status page) | N/A | N/A | `photo_submission_approved`, `photo_submission_rejected` | Implemented |
+| Photo Challenge Analytics | Understand challenge participation | Admin | `/admin/photo-challenge/analytics` | Submissions, Unique Participants, Pending/Approved/Rejected counts from Firestore; Views/Upload Attempts shown as unavailable in-app (see `ANALYTICS.md`) | `PhotoSubmission[]` | Numbers match underlying data | No submissions yet → zeros | N/A | None (internal view) | Implemented |
+
+**Explicitly out of scope for this pass** (per the approved plan): reward-point crediting to a wallet (no such system exists to credit into — `rewardPoints` is stored only), external AI-image-detection APIs (declaration + terms + moderation only), a second admin role system, multiple concurrent challenges (v1 is a singleton).
+
 ## 4. Product Rules vs Technical Implementation
 
 Kept separate deliberately — see each feature's rule below, and `ARCHITECTURE.md` / `FIREBASE_SCHEMA.md` for the corresponding technical implementation, so the technical implementation can change without silently changing product behavior.
@@ -66,6 +83,10 @@ Kept separate deliberately — see each feature's rule below, and `ARCHITECTURE.
   **Technical Implementation:** prototype — aggregation computed client-side over all local responses (acceptable only because there is no other real user); production — a separate public-readable counters document, raw responses admin-only. See `FIREBASE_SCHEMA.md`.
 - **Product Rule:** Admin actions require authentication; only admins can manage content.
   **Technical Implementation:** prototype — none (explicitly open, prototype-only); production — Firebase Auth + `admin` custom claim enforced by security rules, not just UI hiding. See `ADMIN_PANEL.md`.
+- **Product Rule:** A user may replace their Photo Challenge submission at most once (the configured `allowedPhotoChanges`, default 1).
+  **Technical Implementation:** `firestore.rules` allows a self-update to `submissions/{uid}` only if the new `photoChangeCount` is exactly one more than the current value and still below the parent challenge's `allowedPhotoChanges` — enforced server-side, not just by hiding the "Change Photo" button. See `SECURITY.md`.
+- **Product Rule:** The public Community Gallery never exposes a submitter's identity (email, uid, internal ids) or moderation data.
+  **Technical Implementation:** a separate `gallery` subcollection holding only `imageUrl`/`submittedAt`, written by the admin action that approves a submission — the public gallery never reads the `submissions` collection directly. See `FIREBASE_SCHEMA.md`.
 
 ## 5. Requirement IDs
 
@@ -90,6 +111,10 @@ Stable IDs for future reference. Update the matching entry in place when a requi
 | GT-ANALYTICS-001 | Admin users can view participation, completion-funnel and option-distribution analytics, including a Kyn-vs-external traffic breakdown. |
 | GT-AUTH-001 | `[Production]` Admin routes and admin-only data require Firebase Authentication plus an `admin` custom claim, enforced server-side by Firestore security rules — never by frontend checks alone. |
 | GT-AUTH-002 | `[Production]` Public users are identified by a Firebase Anonymous Auth UID, created transparently on first visit. |
+| GT-PHOTO-001 | A public user may submit at most one photo per Photo Challenge, and replace it at most `allowedPhotoChanges` times (default 1), enforced server-side. |
+| GT-PHOTO-002 | Submitting requires accepting the current Terms & Conditions version and declaring the photo is real (not AI-generated); Submit is disabled until both are checked. |
+| GT-PHOTO-003 | Only `approved` submissions appear in the public Community Gallery; the gallery never exposes submitter identity. |
+| GT-PHOTO-004 | Admin users can configure the current challenge (question, dates, limits, terms) and moderate submissions (Approve/Reject-with-reason/Remove). |
 
 ## 6. Open Questions (`[TBD]`)
 

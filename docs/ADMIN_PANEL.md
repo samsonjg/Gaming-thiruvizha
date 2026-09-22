@@ -60,6 +60,15 @@ Either way, the new admin must sign out and back in (or wait up to an hour for t
 
 Neither script nor the service account key are part of this repository's runtime — they're operational tooling, not app code.
 
+## Photo Challenge
+
+A new nav item, `/admin/photo-challenge/{config,submissions,analytics}`, added alongside Events/Polls/Responses/Analytics/Settings — same `RequireAdmin` guard, same `admin` claim, no second admin system. Three tabs (`features/admin/PhotoChallengeTabs.tsx`):
+- **Configuration** — the single form editing the current challenge (title, question, description, reward points, status, dates, max photos, allowed photo changes, max file size, allowed file types, Terms & Conditions + version, AI declaration text). v1 is a singleton — no list-management UI, matching the product mockup.
+- **Submissions** — table of submissions with a status filter, View/Approve/Reject/Remove actions. Reject and Remove both require a reason (`features/admin/RejectSubmissionModal.tsx`, reusing `components/ui/Modal.tsx` like `PublishModal`); Remove additionally deletes the Storage object(s) but keeps the Firestore record (with the reason/admin/timestamp) as an audit trail.
+- **Analytics** — Submissions/Unique Participants/Pending/Approved/Rejected from Firestore; see `ANALYTICS.md` for why Views/Upload Attempts aren't shown here.
+
+See `FIREBASE_SCHEMA.md` for the `photoChallenges` collection and `SECURITY.md` for how the one-photo-change limit is enforced server-side, not just in this UI.
+
 ## Revoking admin access
 
 Same script, with `--revoke`, then have that user sign out. There's no in-app "remove admin" button for the same reason there's no "add admin" button — this is a deliberately out-of-band operation.

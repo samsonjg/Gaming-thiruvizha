@@ -2,6 +2,7 @@ import { initializeApp, type FirebaseApp } from 'firebase/app'
 import { getAuth, type Auth } from 'firebase/auth'
 import { initializeFirestore, type Firestore } from 'firebase/firestore'
 import type { Analytics } from 'firebase/analytics'
+import type { FirebaseStorage } from 'firebase/storage'
 import { firebaseConfig, isFirebaseConfigured } from '../../config/firebaseConfig'
 
 // The only place `initializeApp` is called. Every other module imports
@@ -38,4 +39,20 @@ export { app, auth, db }
 
 export function getAnalyticsInstance(): Analytics | undefined {
   return analytics
+}
+
+// `firebase/storage` is only needed by the Photo Challenge feature
+// (photoSubmissions.repository.ts), which is itself only reachable via
+// the lazy-loaded /photo-challenge route and lazy admin routes — so it's
+// dynamically imported here too, same reasoning as Analytics above, to
+// keep it out of the Poll's critical-path bundle. Cached after first call.
+let storagePromise: Promise<FirebaseStorage | undefined> | undefined
+
+export function getStorageInstance(): Promise<FirebaseStorage | undefined> {
+  if (!isFirebaseConfigured || !app) return Promise.resolve(undefined)
+  if (!storagePromise) {
+    const currentApp = app
+    storagePromise = import('firebase/storage').then(({ getStorage }) => getStorage(currentApp))
+  }
+  return storagePromise
 }

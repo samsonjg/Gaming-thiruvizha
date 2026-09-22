@@ -36,26 +36,32 @@ src/
 ├── features/
 │   ├── questions/              The reusable question engine — see "Question engine" below
 │   ├── auth/                   RequireAdmin route guard, AdminLoginForm
-│   └── admin/                  PublishModal (shared across admin question screens)
+│   ├── admin/                  PublishModal, PhotoChallengeTabs, RejectSubmissionModal
+│   └── photo-challenge/         Public Photo Challenge UI — PhotoChallengeCard, PhotoUploadFlow,
+│                               MySubmissionStatus, PhotoGallery (see "Photo Challenge module")
 │
 ├── pages/
-│   ├── public/                 KynEventPage, PollPage (+ PollLanding/Flow/Results/Complete)
+│   ├── public/                 KynEventPage, PollPage (+ PollLanding/Flow/Results/Complete),
+│                               PhotoChallengePage
 │   └── admin/                  One file per admin route (Dashboard, Events, EventForm, Polls,
 │                               Questions, QuestionBuilder, QuestionPreview, Responses,
-│                               Analytics, Settings)
+│                               Analytics, Settings, PhotoChallengeConfig,
+│                               PhotoChallengeSubmissions, PhotoChallengeAnalytics)
 │
 ├── hooks/                       Domain hooks wrapping repositories: useAsync (shared primitive),
 │                               useEvents, usePolls (+ useActivePoll), useQuestions, useOptions,
-│                               useAnalytics, useSession, usePollBundle
+│                               useAnalytics, useSession, usePollBundle, usePhotoChallenge
 │
 ├── repositories/                One file per entity (events/polls/questions/options/responses/
-│                               stats), all Firestore-backed, all async, all returning plain
-│                               TypeScript types from types/schema.ts — never a Firestore
-│                               DocumentSnapshot leaking upward. _firestore.ts holds the shared
-│                               requireDb()/withId() helpers.
+│                               stats/photoChallenges/photoSubmissions), all Firestore-backed,
+│                               all async, all returning plain TypeScript types from
+│                               types/schema.ts — never a Firestore DocumentSnapshot leaking
+│                               upward. _firestore.ts holds the shared requireDb()/withId()
+│                               helpers.
 │
 ├── services/
-│   └── firebase/app.ts          The ONLY initializeApp() call — exports auth/db singletons
+│   └── firebase/app.ts          The ONLY initializeApp() call — exports auth/db singletons,
+│                               lazily-loaded analytics and Storage instances
 │
 ├── types/schema.ts               Every domain type (Event, Poll, Question, QuestionOption,
 │                               Response, ResponseAnswer, UserSession, AnswerValue), platform-
@@ -66,7 +72,9 @@ src/
 │
 ├── config/firebaseConfig.ts       Reads VITE_FIREBASE_* env vars; exposes isFirebaseConfigured
 │
-└── utils/                        Small pure helpers (csv export, date formatting, validation)
+└── utils/                        Small pure helpers (csv export, date formatting, validation,
+                                imageValidation.ts — file type/size checks + canvas-based
+                                compression for Photo Challenge uploads, no new npm dependency)
 ```
 
 ## Question engine
@@ -80,6 +88,12 @@ The single most important reusable asset in this codebase. `features/questions/Q
 Two places render this: the public poll flow (`pages/public/PollFlow.tsx`) and the admin "Preview" screen (`pages/admin/QuestionPreview.tsx`) — **the same component**, not a lookalike. If they ever diverge, that's a bug (see `AI_CONTEXT.md` do-not-break rule #2), not a feature.
 
 Adding a ninth question type: one new component in `features/questions/`, one `case` in `QuestionRenderer`, one entry in `constants/questionTypeMeta.ts` (`QUESTION_TYPE_META`, which also drives the admin's type dropdown and the "does this type have options" branching). Nothing else in the app needs to change.
+
+## Photo Challenge module
+
+An independent feature module living entirely in `features/photo-challenge/`, `pages/{public,admin}/PhotoChallenge*`, `hooks/usePhotoChallenge.ts`, and `repositories/{photoChallenges,photoSubmissions}.repository.ts` — added alongside the Poll, not touching any Poll file. Same layering (`UI → hooks → repositories → Firebase`), same Firebase project, same admin authorization (`RequireAdmin`, the `admin` custom claim), same UI kit (`components/ui/*`) reused as-is.
+
+The one addition to `services/firebase/app.ts` is `getStorageInstance()` — a lazily-imported Firebase Storage singleton, mirroring the existing lazy-Analytics pattern (`import('firebase/storage')` only runs when a Photo Challenge screen actually needs it, so public Poll-only visitors never download the Storage SDK). Images live in Storage (`photoChallenges/{challengeId}/{userId}/photo_{version}.{ext}`); Firestore stores only metadata. See `FIREBASE_SCHEMA.md` and `SECURITY.md`.
 
 ## Routing
 

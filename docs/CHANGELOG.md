@@ -5,7 +5,14 @@ Every meaningful product or architecture change gets an entry here — see `AI_C
 ## 2026-09-22
 
 ### Added
+- **Photo Challenge** — a second, independent engagement module alongside the Poll (not a replacement, not a second app/admin panel/auth system/Firebase project). Public flow at `/photo-challenge`: upload → preview → AI-declaration + Terms checkboxes → submit → status page (with one allowed photo change) → paginated Community Gallery of approved photos. Admin flow at `/admin/photo-challenge/{config,submissions,analytics}`: singleton Configuration form, Submissions table with Approve/Reject-with-reason/Remove, and a Firestore-derived Analytics tab. New collections `photoChallenges/{id}` (+ nested `submissions/{uid}`, `gallery/{uid}`) and a new `storage.rules` file (Firebase Storage now used for the first time in this project, for photo files only — metadata stays in Firestore). See `PRD.md` §3a, `FIREBASE_SCHEMA.md`, `SECURITY.md`, `ARCHITECTURE.md` "Photo Challenge module", `ADMIN_PANEL.md`, `ANALYTICS.md`.
 - `scripts/add-admin.cjs` — creates a Firebase Auth account with a temporary password and grants the `admin` custom claim in one step, for provisioning additional admins. Deliberately kept as a local script rather than an in-app "add admin" UI: that would require a Cloud Function (custom claims and creating other users' accounts are Admin-SDK-only, server-side-only operations), which would force the project off the free Spark plan onto Blaze — not worth it for provisioning a handful of internal accounts. See `docs/ADMIN_PANEL.md`.
+
+### Database
+- Added `photoChallenges/{challengeId}` (+ nested `submissions/{uid}`, `gallery/{uid}`) to Firestore, and two new composite indexes (`photoChallenges: status ASC, createdAt DESC`; `submissions: status ASC, submittedAt DESC`) — added proactively this time, learning from the `questions` index incident on 2026-09-18. No existing Poll collection changed.
+
+### Security
+- One-photo-change limit enforced in `firestore.rules` itself (not just the client): a user's self-update to their submission may only move `photoChangeCount` forward by exactly 1, and only while still below the challenge's configured `allowedPhotoChanges`. New `storage.rules` (Storage used for the first time in this project): owner-or-admin read/write/delete, content-type allowlist, size ceiling.
 
 ## 2026-09-18
 

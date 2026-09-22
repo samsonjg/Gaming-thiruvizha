@@ -117,5 +117,61 @@ service cloud.firestore {
       allow read: if isSignedIn() && (request.auth.uid == uid || isAdmin());
       allow write: if false;
     }
+
+    // ---------------- photoChallenges (extension module — docs/PRD.md "Photo Challenge") ----------------
+    // Independent of the Poll collections above; nothing here is read by
+    // any Poll rule and nothing above is read by these.
+    match /photoChallenges/{challengeId} {
+      allow read: if resource.data.status == 'active' || isAdmin();
+      allow write: if isAdmin();
+
+      // Doc id == uid: one submission per user, mirroring the responses/
+      // pattern above (a second `create` for the same id is rejected as
+      // an update, not a duplicate create).
+      match /submissions/{uid} {
+        allow get: if isAdmin() || (isSignedIn() && request.auth.uid == uid);
+        allow list: if isAdmin();
+
+        allow create: if isSignedIn()
+          && request.auth.uid == uid
+          && request.resource.data.userId == uid
+          && request.resource.data.status == 'pending'
+          && request.resource.data.photoChangeCount == 0
+          && request.resource.data.termsAccepted == true
+          && request.resource.data.realPhotoConfirmed == true;
+
+        // The one-change limit, enforced here (not just in the client):
+        // a user's own update may only ever move photoChangeCount forward
+        // by exactly 1, up to the challenge's configured limit, and may
+        // never touch status/rejectionReason/approvedBy/rejectedBy/userId.
+        // See docs/SECURITY.md "Photo Challenge — one photo change".
+        allow update: if isAdmin()
+          || (isSignedIn()
+            && request.auth.uid == uid
+            && resource.data.userId == request.resource.data.userId
+            && resource.data.status == request.resource.data.status
+            && request.resource.data.photoChangeCount == resource.data.photoChangeCount + 1
+            && resource.data.photoChangeCount
+              < get(/databases/$(database)/documents/photoChallenges/$(challengeId)).data.allowedPhotoChanges
+            // .get(field, null) instead of dot-access: these fields don't
+            // exist on a fresh submission doc, and dot-accessing a missing
+            // map key throws in the rules engine (silently denying the
+            // whole write) rather than returning null — caught by a direct
+            // rules test against the deployed rules, see docs/SECURITY.md.
+            && request.resource.data.get('rejectionReason', null) == resource.data.get('rejectionReason', null)
+            && request.resource.data.get('approvedBy', null) == resource.data.get('approvedBy', null)
+            && request.resource.data.get('rejectedBy', null) == resource.data.get('rejectedBy', null));
+
+        allow delete: if isAdmin();
+      }
+
+      // Public-safe denormalization of approved submissions only — see
+      // repositories/photoSubmissions.repository.ts approveSubmission/
+      // rejectSubmission. Never contains userId or any internal id.
+      match /gallery/{uid} {
+        allow read: if true;
+        allow write: if isAdmin();
+      }
+    }
   }
 }

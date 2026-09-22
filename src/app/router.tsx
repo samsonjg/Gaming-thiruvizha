@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react'
 import { Routes, Route } from 'react-router-dom'
 import { KynEventPage } from '../pages/public/KynEventPage'
 import { PollPage } from '../pages/public/PollPage'
+import { PhotoChallengePage } from '../pages/public/PhotoChallengePage'
 import { RequireAdmin } from '../features/auth/RequireAdmin'
 import { LoadingState } from '../components/ui'
 
@@ -20,6 +21,15 @@ const QuestionPreview = lazy(() => import('../pages/admin/QuestionPreview').then
 const Responses = lazy(() => import('../pages/admin/Responses').then((m) => ({ default: m.Responses })))
 const Analytics = lazy(() => import('../pages/admin/Analytics').then((m) => ({ default: m.Analytics })))
 const Settings = lazy(() => import('../pages/admin/Settings').then((m) => ({ default: m.Settings })))
+const PhotoChallengeConfig = lazy(() =>
+  import('../pages/admin/PhotoChallengeConfig').then((m) => ({ default: m.PhotoChallengeConfig })),
+)
+const PhotoChallengeSubmissions = lazy(() =>
+  import('../pages/admin/PhotoChallengeSubmissions').then((m) => ({ default: m.PhotoChallengeSubmissions })),
+)
+const PhotoChallengeAnalytics = lazy(() =>
+  import('../pages/admin/PhotoChallengeAnalytics').then((m) => ({ default: m.PhotoChallengeAnalytics })),
+)
 
 function AdminFallback() {
   return (
@@ -39,6 +49,7 @@ export function AppRoutes() {
     <Routes>
       <Route path="/" element={<KynEventPage />} />
       <Route path="/poll/:slug" element={<PollPage />} />
+      <Route path="/photo-challenge" element={<PhotoChallengePage />} />
 
       <Route
         path="/admin"
@@ -61,6 +72,9 @@ export function AppRoutes() {
         <Route path="polls/:pollId/questions/:questionId/preview" element={<QuestionPreview />} />
         <Route path="responses" element={<Responses />} />
         <Route path="analytics" element={<Analytics />} />
+        <Route path="photo-challenge/config" element={<PhotoChallengeConfig />} />
+        <Route path="photo-challenge/submissions" element={<PhotoChallengeSubmissions />} />
+        <Route path="photo-challenge/analytics" element={<PhotoChallengeAnalytics />} />
         <Route path="settings" element={<Settings />} />
       </Route>
     </Routes>

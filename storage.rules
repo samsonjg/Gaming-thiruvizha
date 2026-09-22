@@ -1,0 +1,29 @@
+rules_version = '2';
+
+// Photo Challenge images only — see docs/SECURITY.md "Photo Challenge —
+// Storage". A download URL carries its own bearer token and stays
+// fetchable once issued regardless of these rules (that's what lets the
+// public gallery show approved photos without `allow read: if true`
+// here); these rules gate the SDK/enumeration path: only the owning user
+// or an admin may read, write, or delete a given path.
+service firebase.storage {
+  match /b/{bucket}/o {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.admin == true;
+    }
+
+    match /photoChallenges/{challengeId}/{userId}/{fileName} {
+      allow read: if isAdmin() || (isSignedIn() && request.auth.uid == userId);
+
+      allow write: if (isAdmin() || (isSignedIn() && request.auth.uid == userId))
+        && request.resource.size < 10 * 1024 * 1024
+        && request.resource.contentType.matches('image/(jpeg|png|webp)');
+
+      allow delete: if isAdmin() || (isSignedIn() && request.auth.uid == userId);
+    }
+  }
+}

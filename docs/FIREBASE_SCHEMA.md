@@ -13,6 +13,9 @@ polls/{pollId}
   questionStats/{questionId}
 sessions/{uid}
 adminUsers/{uid}
+photoChallenges/{challengeId}
+  submissions/{uid}
+  gallery/{uid}
 ```
 
 ---
@@ -168,9 +171,84 @@ adminUsers/{uid}
 
 ---
 
+### `photoChallenges/{challengeId}`
+
+**Purpose:** The Photo Challenge module — an independent engagement activity alongside the Poll, not part of it. See `PRD.md` "Photo Challenge". v1 is a singleton in practice (`getCurrentChallenge()`/`getActiveChallenge()` both resolve to `orderBy('createdAt','desc') limit(1)`, with `getActiveChallenge` additionally filtering `status == 'active'`), modeled as a real collection so multi-challenge support isn't blocked later.
+**Document ID:** Firestore auto-id.
+
+| Field | Type | Notes |
+|---|---|---|
+| title | string | |
+| question | string | The prompt shown to users — never hardcoded in the UI |
+| description | string | |
+| rewardPoints | number | Stored only — no wallet/crediting system exists to pay it out. Never touches Poll scoring. |
+| status | `'draft' \| 'active' \| 'inactive'` | |
+| startAt, endAt | string (ISO date) | `endAt < now` shows "This Photo Challenge has ended" even if `status` is still `active` |
+| maxPhotos | number | Default 1 |
+| allowedPhotoChanges | number | Default 1 — the ceiling enforced server-side, see `submissions` below |
+| maxFileSizeBytes | number | Client-validated; also a hard ceiling in `storage.rules` |
+| allowedFileTypes | string[] | e.g. `['image/jpeg','image/png','image/webp']` |
+| termsContent | string | Shown inline (collapsible) at submission time |
+| termsVersion | string | Recorded on each submission |
+| aiDeclarationText | string | The checkbox label |
+| createdAt, updatedAt | string (ISO datetime) | |
+
+**Who can read:** Anyone, if `status == 'active'`; admins, always.
+**Who can write:** Admins only.
+
+---
+
+### `photoChallenges/{challengeId}/submissions/{uid}`
+
+**Purpose:** One user's photo submission (GT-PHOTO-001). **Admin-only to `list`** — same shape as Poll `responses`.
+**Document ID:** the submitting user's uid — one submission per user per challenge, and it's what makes "the second write is an update, not a second create" enforceable.
+
+| Field | Type | Notes |
+|---|---|---|
+| challengeId | string | Redundant with the path, kept for self-contained reads (used by `removeSubmissionPhoto`) |
+| userId | string | Must equal the doc id |
+| imageUrl | string | Storage download URL (carries its own bearer token — see `SECURITY.md`) |
+| storagePath | string | `photoChallenges/{challengeId}/{userId}/photo_{version}.{ext}` |
+| fileName, fileSize, contentType | string / number / string | |
+| status | `'pending' \| 'approved' \| 'rejected'` | |
+| photoChangeCount | `0 \| 1` (or up to `allowedPhotoChanges`) | The field the one-change limit is built on |
+| termsAccepted, termsAcceptedAt, termsVersion | boolean / ISO datetime / string | |
+| realPhotoConfirmed, realPhotoConfirmedAt | boolean / ISO datetime | The "not AI-generated" declaration — see `PRD.md`, no external AI-detection API is used |
+| submittedAt, updatedAt | string (ISO datetime) | |
+| rejectionReason, rejectedBy, rejectedAt | string / uid / ISO datetime | Set on reject; kept even after "Remove" as an audit trail |
+| approvedBy, approvedAt | uid / ISO datetime | |
+
+**Who can read:** Admins can `get`/`list` any submission. A signed-in user can `get` only their own (doc id == their uid).
+**Who can create:** The owning uid only, and only with `status: 'pending'`, `photoChangeCount: 0`, `termsAccepted: true`, `realPhotoConfirmed: true`.
+**Who can update:** Admins, unrestricted (moderation). The owning uid, but **only** to move `photoChangeCount` forward by exactly 1 and only while `resource.data.photoChangeCount < allowedPhotoChanges` on the parent challenge doc (read via `get()` in the rule) — `status`, `rejectionReason`, `approvedBy`, `rejectedBy`, and `userId` may not change in a self-update. This is enforced in `firestore.rules`, not just in React state — see `SECURITY.md`.
+**Who can delete:** Admins only (not used by any current UI flow — "Remove" rejects + deletes the Storage object but keeps the Firestore record).
+
+---
+
+### `photoChallenges/{challengeId}/gallery/{uid}`
+
+**Purpose:** Public-safe denormalization of *approved* submissions — the only thing the public Community Gallery reads. Same "public aggregate, never raw records" pattern as `questionStats`. Written when an admin approves a submission; deleted when an admin rejects or removes one.
+**Document ID:** the submitting user's uid (internal — never rendered).
+
+| Field | Type | Notes |
+|---|---|---|
+| imageUrl | string | |
+| submittedAt | string (ISO datetime) | |
+
+Deliberately excludes `userId`, any internal id, and all admin/status fields — see `PRD.md` "Community Gallery" ("Do not expose: Email, Phone, Firebase UID, Internal IDs, Admin data").
+
+**Who can read:** Anyone.
+**Who can write:** Admins only.
+
+---
+
+## Storage
+
+`photoChallenges/{challengeId}/{userId}/photo_{version}.{ext}` — `version` is `photoChangeCount` at upload time (`0` for the original, `1` for the one replacement), so a change never overwrites in place; both stay in Storage for admin audit until "Remove" explicitly deletes them. See `storage.rules`: owner-or-admin read/write/delete, `image/jpeg|png|webp` only, 10MB hard ceiling (defense-in-depth — the admin-configured `maxFileSizeBytes` is the real UX-facing limit, enforced client-side).
+
 ## Indexes
 
-`firestore.indexes.json` defines one composite index today: `questions` on `(status ASC, order ASC)`, required by `getPublishedQuestions()` (`repositories/questions.repository.ts`) — it combines an equality filter (`status == 'published'`) with an `orderBy('order')` on a different field, which Firestore does not auto-index. This surfaced as a real production bug (the public poll returned "not found" with no error surfaced to the user) before the index was deployed — see `git log` around 2026-09-18 and `docs/CHANGELOG.md`.
+`firestore.indexes.json` defines three composite indexes: `questions` on `(status ASC, order ASC)`, required by `getPublishedQuestions()` (`repositories/questions.repository.ts`) — it combines an equality filter (`status == 'published'`) with an `orderBy('order')` on a different field, which Firestore does not auto-index. This surfaced as a real production bug (the public poll returned "not found" with no error surfaced to the user) before the index was deployed — see `git log` around 2026-09-18 and `docs/CHANGELOG.md`. `photoChallenges` on `(status ASC, createdAt DESC)` for `getActiveChallenge()`, and `submissions` on `(status ASC, submittedAt DESC)` for the admin Submissions table's status filter — both added proactively this time, learning from the incident above.
 
 Every other query this app issues is either a single-field equality filter, a single `orderBy`, or multiple independent equality filters on a small subcollection — none of which need an explicit composite index. If you add a new query that combines `orderBy` with an equality or range filter on a *different* field, Firestore will refuse it at runtime with `failed-precondition` and a console link to the exact index to create — add it there, then copy the same field list into `firestore.indexes.json` (`npx firebase-tools firestore:indexes` prints the current deployed set) and `firebase deploy --only firestore:indexes` so it's captured for every future deploy, not just fixed once by hand in the console.
 

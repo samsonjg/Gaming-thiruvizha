@@ -27,6 +27,26 @@ Wraps `firebase/analytics`'s `logEvent`. No-ops safely (never throws) when `isFi
 
 Admin-side screens (Dashboard, Question Builder, Responses, Analytics) are internal tooling — no analytics events are planned for them; they're for the team's own admin session, not a growth metric.
 
+## Photo Challenge — actually wired
+
+Unlike the Poll events above, the Photo Challenge event names below **are live** — real `analytics.track()` call sites exist in `features/photo-challenge/*` and `pages/public/PhotoChallengePage.tsx`. No new analytics platform was introduced; every call goes through the same `services/analytics/analytics.ts` abstraction.
+
+| Event Name | Trigger | Call site |
+|---|---|---|
+| `photo_challenge_viewed` | `/photo-challenge` renders with a loaded challenge | `PhotoChallengePage.tsx` |
+| `photo_upload_started` | User selects a file (before validation) | `PhotoUploadFlow.tsx` |
+| `photo_selected` | The file passes validation/compression and shows a preview | `PhotoUploadFlow.tsx` |
+| `photo_submission_started` | Submit tapped, mode `submit` | `PhotoUploadFlow.tsx` |
+| `photo_submission_success` | `submitPhoto()` resolves, mode `submit` | `PhotoUploadFlow.tsx` |
+| `photo_submission_failed` | `onSubmit` throws, either mode | `PhotoUploadFlow.tsx` |
+| `photo_change_started` | Submit tapped, mode `change` | `PhotoUploadFlow.tsx` |
+| `photo_change_completed` | `changePhoto()` resolves, mode `change` | `PhotoUploadFlow.tsx` |
+| `photo_gallery_viewed` | `PhotoGallery` mounts (once, not per page load) | `PhotoGallery.tsx` |
+| `photo_submission_approved` | Admin approves a submission | `PhotoChallengeSubmissions.tsx` |
+| `photo_submission_rejected` | Admin rejects/removes a submission | `PhotoChallengeSubmissions.tsx` |
+
+**Admin-side reporting limitation:** the admin Photo Challenge Analytics tab (`pages/admin/PhotoChallengeAnalytics.tsx`) can only show metrics derivable from Firestore (Submissions, Unique Participants, Pending/Approved/Rejected) — the same constraint the Poll's admin Analytics has always had. "Views" and "Upload Attempts" (and the resulting Submission Conversion Rate) are fired to Firebase Analytics but are **not** read back into the admin UI, since that requires a GA4/BigQuery export or the Analytics Reporting API, neither of which is wired up in this project. View them directly in the Firebase Analytics console for now.
+
 ## What NOT to send
 
 Per `PRD.md`'s "Aggregated Results" product rule and general privacy hygiene:
