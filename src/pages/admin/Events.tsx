@@ -1,8 +1,15 @@
+import * as eventsRepository from '../../repositories/events.repository'
 import { useEvents } from '../../hooks/useEvents'
-import { PageHeader, Card, Badge, LinkButton, LoadingState, ErrorState, EmptyState } from '../../components/ui'
+import { PageHeader, Card, Badge, LinkButton, IconButton, LoadingState, ErrorState, EmptyState } from '../../components/ui'
 
 export function Events() {
   const { data: events, loading, error, reload } = useEvents()
+
+  async function remove(id: string, name: string) {
+    if (!confirm(`Delete event "${name || '(untitled)'}"? This cannot be undone. Polls under this event are not deleted.`)) return
+    await eventsRepository.deleteEvent(id)
+    reload()
+  }
 
   return (
     <div className="flex flex-col">
@@ -38,6 +45,9 @@ export function Events() {
               <LinkButton to={`/admin/polls?eventId=${event.id}`} variant="secondary">
                 View Polls
               </LinkButton>
+              <IconButton onClick={() => remove(event.id, event.name)} title="Delete event">
+                🗑️
+              </IconButton>
             </div>
           </Card>
         ))}
