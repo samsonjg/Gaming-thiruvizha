@@ -28,7 +28,18 @@ export function EventForm() {
   useEffect(() => {
     if (!isNew && id) {
       eventsRepository.getEvent(id).then((event) => {
-        if (event) setForm(event)
+        // Strip `id` before putting the fetched record into form state —
+        // EventRecord has an `id` field but `form` is typed without one;
+        // TypeScript's excess-property check doesn't catch this because
+        // `event` comes from a function return, not an object literal, so
+        // without stripping it here `id` silently rides along into every
+        // update() call below and gets written back as a real field
+        // inside the document (harmless to reads, but redundant/messy
+        // data — this happened to the live event once already).
+        if (event) {
+          const { id: _ignoredId, ...rest } = event
+          setForm(rest)
+        }
       })
     }
   }, [id, isNew])
@@ -105,7 +116,7 @@ export function EventForm() {
             <Button variant="secondary" onClick={() => navigate('/admin/events')}>
               Cancel
             </Button>
-            <Button onClick={handleSave} disabled={saving}>
+            <Button onClick={handleSave} disabled={saving || !form.name.trim() || !form.venue.trim()}>
               {saving ? 'Saving…' : 'Save Event'}
             </Button>
           </div>
