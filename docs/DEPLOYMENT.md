@@ -29,6 +29,27 @@ npx firebase-tools deploy --only hosting
 
 Or both together: `npx firebase-tools deploy`. Run rules/indexes and hosting as separate, deliberate steps in CI if you want to review a rules diff before it goes live — a bad security rule change is higher-stakes than a bad UI deploy.
 
+## Billing hard cutoff (optional, off by default)
+
+`functions/index.js` contains one Cloud Function, `stopBillingOnBudgetExceeded`, that disables billing for this GCP project entirely — Hosting, Firestore, Storage, Auth all go offline immediately, no grace period — the moment actual spend reaches or exceeds a configured budget. It only exists because the project owner explicitly asked for a hard safety net on top of the (recommended, lower-risk) email budget alerts; it is not part of the normal architecture and this app worked fine without any Cloud Functions before it. See `SECURITY.md` "Billing hard cutoff" for the tradeoffs.
+
+**This function alone does nothing until three manual console steps are done** (all deliberately left to the project owner — they grant a genuinely sensitive billing permission, not something to automate):
+
+1. **Create the budget** in [Google Cloud Console → Billing → Budgets & alerts](https://console.cloud.google.com/billing) for the `gaming-thiruvizha-2026` project, with whatever amount and percentage-threshold alerts you want (e.g. 50/80/100%).
+2. **Connect a Pub/Sub topic** to that budget: in the budget's "Manage notifications" section, create (or select) a topic named exactly `budget-alerts` — the function is hardcoded to listen on that topic name (see `functions/index.js`'s `topic: 'budget-alerts'`). Every budget update (any threshold crossing, not just 100%) publishes a message here; the function itself is what decides to actually act only once `costAmount > budgetAmount`.
+3. **Grant the function's runtime service account the "Billing Account Administrator" role** on the billing account (Billing → Account Management → Permissions → Add principal). After first deploy, the relevant service account is the project's default compute service account, `<PROJECT_NUMBER>-compute@developer.gserviceaccount.com` (find `PROJECT_NUMBER` in Project Settings). Without this role the function's billing-disable call fails silently — the budget will still email you, but the site will NOT go offline, so verify this step actually took effect (see "Testing" below).
+
+**Deploy the function:**
+
+```bash
+cd functions && npm install && cd ..
+npx firebase-tools deploy --only functions
+```
+
+**Testing:** Google Cloud Billing does not offer a "send a test notification" button — the only reliable way to verify the full chain (budget → Pub/Sub → function → billing API call) works is to temporarily set the budget amount below current month-to-date spend, confirm a Cloud Functions log line appears for `stopBillingOnBudgetExceeded` within a few minutes, then immediately restore the real budget amount and manually re-check that billing is still enabled (`gcloud billing projects describe` or the Console) before moving on — do this test only when you're prepared for the project to actually go offline as a result.
+
+**Re-enabling after a cutoff:** Cloud Console → Billing → link a billing account to the project again (My Projects → select project → "Link a billing account"). Nothing about the app code needs to change; Hosting/Firestore/Storage/Auth resume working as soon as billing is relinked.
+
 ## Domain configuration
 
 `[TBD]` — no custom domain is configured in this repository. Firebase Hosting's default `<project-id>.web.app` / `<project-id>.firebaseapp.com` domains work out of the box; adding a custom domain is a Firebase console step (Hosting → Add custom domain) with no code changes required.

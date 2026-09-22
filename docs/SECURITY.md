@@ -21,7 +21,7 @@ Public users are Firebase Anonymous Auth sessions, created transparently on firs
 ## Known residual risks (not hidden)
 
 - **`questionStats` counters can be written by any signed-in user, not just via the intended `submitAnswer` flow.** Firestore rules can't cheaply verify "this write is exactly `increment(1))` on the right field" without a Cloud Function owning the write. A malicious anonymous client could in principle call the Firestore SDK directly and corrupt a poll's displayed percentages. Accepted for now because the blast radius is a display-only aggregate (no financial, PII, or security impact) — revisit with a Cloud Function that owns all writes to this collection if that risk profile changes (e.g. Gaming Thiruvizha results start being used for a public leaderboard or prize).
-- **No rate limiting.** Nothing stops a script from creating many anonymous sessions and submitting many responses. Firebase App Check (mentioned in the task brief) would mitigate this but hasn't been enabled — see `ARCHITECTURE.md`/`AI_CONTEXT.md` "No Cloud Functions, no Storage, no App Check in this pass." Add if abuse is actually observed.
+- **No rate limiting.** Nothing stops a script from creating many anonymous sessions and submitting many responses. Firebase App Check (mentioned in the task brief) would mitigate this but hasn't been enabled — see `AI_CONTEXT.md` "No App Check" note. Add if abuse is actually observed.
 - **No password reset flow in the admin login UI.** Use the Firebase console to reset an admin's password today (`ADMIN_PANEL.md`).
 - **Responses are immutable, including for admins, via the client.** There's no "correct a bad response" or "delete a spam response" admin tool yet. If that's needed, it should go through a Cloud Function (for an audit trail) rather than opening `update`/`delete` to the client — don't "fix" this by loosening `firestore.rules`.
 
@@ -53,6 +53,10 @@ A Firebase Storage download URL carries its own bearer token and stays fetchable
 ## Photo Challenge — no AI-detection API, declaration-based only
 
 Per the product decision, there is no external AI-image-detection service call anywhere in this flow. "Not AI-generated" is a user declaration (`realPhotoConfirmed`, gating the Submit button) plus Terms & Conditions acceptance plus admin moderation (Approve/Reject with a reason) — the same trust model already used for admin-moderated content elsewhere in this app. If abuse is observed, the fix is better admin moderation UX, not a bolted-on detection API.
+
+## Billing hard cutoff
+
+`functions/index.js` has an opt-in Cloud Function (`stopBillingOnBudgetExceeded`) that disables billing for the whole GCP project — taking Hosting, Firestore, Storage, and Auth offline instantly, with no grace period and no automatic recovery — once actual spend crosses a configured budget. This exists at the project owner's explicit request as a worst-case safety net, on top of the (recommended, non-destructive) email budget alerts. It is a genuinely blunt instrument: a legitimate traffic spike during the live event would be shut down exactly as hard as real abuse, with zero warning to visitors. See `DEPLOYMENT.md` "Billing hard cutoff" for setup and the manual IAM step this deliberately does not automate (granting a service account the Billing Account Administrator role — that permission grant is left to the project owner, not scripted, since it's sensitive enough to warrant a human doing it directly in the Console).
 
 ## Firebase web config is not a secret
 

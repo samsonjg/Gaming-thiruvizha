@@ -27,9 +27,9 @@ UI (pages/components) → hooks (features/*) → repositories (repositories/*) �
 
 - **Auth:** Anonymous auth for public users (identifies a session/uid without a login screen); email/password for admins.
 - **Firestore:** see `FIREBASE_SCHEMA.md` for the full collection list and field-level schema.
-- **Storage:** not used yet — question options use plain image URL strings, not uploads. `[TBD]` if that changes.
+- **Storage:** used by the Photo Challenge / Snap Hunt feature only (`photoChallenges/{challengeId}/{userId}/photo_{version}.{ext}` — see `FIREBASE_SCHEMA.md`). Poll question options still use plain image URL strings, not uploads.
 - **Analytics:** `services/analytics/analytics.ts` wraps Firebase Analytics `logEvent`; nothing calls the SDK directly outside that file. Event catalogue in `ANALYTICS.md`.
-- **Cloud Functions:** none deployed. Not needed for the current feature set — don't add one without updating this file and `SECURITY.md` to explain why.
+- **Cloud Functions:** one, opt-in and not deployed by default — `functions/stopBillingOnBudgetExceeded`, a billing hard-cutoff safety net added at the project owner's explicit request (see `DEPLOYMENT.md` "Billing hard cutoff" and `SECURITY.md`). Not part of the app's normal request path — don't add another Cloud Function for regular feature work without updating this file and `SECURITY.md` to explain why.
 
 ## Data model quick reference
 
@@ -54,7 +54,7 @@ See `DEPLOYMENT.md`. Firebase Hosting is the assumed target unless the project's
 ## Known limitations (as of this migration)
 
 - No native Android/iOS app exists yet; the architecture is structured to allow one later without duplicating business logic, but nothing native has been built or tested.
-- No Cloud Functions, Storage, or App Check — intentionally out of scope until a real need appears (see `SECURITY.md`).
+- No App Check — intentionally out of scope until a real need appears (see `SECURITY.md`). Storage and one opt-in Cloud Function are now in use (Photo Challenge / Snap Hunt, and the billing hard cutoff, respectively) — both documented above.
 - Admin roles are flat (`admin: true`/absent) — no per-event scoping or role tiers yet (`PRD.md` §6).
 - Analytics event names are provisional (`[TBD]` in `PRD.md`/`ANALYTICS.md`) pending stakeholder input.
 
