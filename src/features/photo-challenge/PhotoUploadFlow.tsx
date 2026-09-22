@@ -17,7 +17,8 @@ interface PhotoUploadFlowProps {
 // external AI-detection API — just the user's declaration + terms +
 // admin moderation, as specified.
 export function PhotoUploadFlow({ challenge, mode, submitting, onSubmit, onCancel }: PhotoUploadFlowProps) {
-  const inputRef = useRef<HTMLInputElement>(null)
+  const cameraInputRef = useRef<HTMLInputElement>(null)
+  const galleryInputRef = useRef<HTMLInputElement>(null)
   const [file, setFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -76,22 +77,42 @@ export function PhotoUploadFlow({ challenge, mode, submitting, onSubmit, onCance
       {!file ? (
         <>
           <input
-            ref={inputRef}
+            ref={cameraInputRef}
+            type="file"
+            accept={challenge.allowedFileTypes.join(',')}
+            capture="environment"
+            className="hidden"
+            onChange={(e) => handleFileSelect(e.target.files?.[0])}
+          />
+          <input
+            ref={galleryInputRef}
             type="file"
             accept={challenge.allowedFileTypes.join(',')}
             className="hidden"
             onChange={(e) => handleFileSelect(e.target.files?.[0])}
           />
-          <motion.button
-            type="button"
-            whileTap={{ scale: 0.97 }}
-            onClick={() => inputRef.current?.click()}
-            disabled={preparing}
-            className="flex min-h-[160px] flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-white/20 text-white/60"
-          >
-            <span className="text-3xl">📷</span>
-            <span className="text-sm font-medium">{preparing ? 'Preparing photo…' : 'Tap to select a photo'}</span>
-          </motion.button>
+          <div className="grid grid-cols-2 gap-3">
+            <motion.button
+              type="button"
+              whileTap={{ scale: 0.97 }}
+              onClick={() => cameraInputRef.current?.click()}
+              disabled={preparing}
+              className="flex min-h-[140px] flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-white/20 text-white/60"
+            >
+              <span className="text-3xl">📷</span>
+              <span className="text-sm font-medium">{preparing ? 'Preparing…' : 'Take Photo'}</span>
+            </motion.button>
+            <motion.button
+              type="button"
+              whileTap={{ scale: 0.97 }}
+              onClick={() => galleryInputRef.current?.click()}
+              disabled={preparing}
+              className="flex min-h-[140px] flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-white/20 text-white/60"
+            >
+              <span className="text-3xl">🖼️</span>
+              <span className="text-sm font-medium">{preparing ? 'Preparing…' : 'Choose from Gallery'}</span>
+            </motion.button>
+          </div>
         </>
       ) : (
         <>
