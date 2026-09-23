@@ -1,4 +1,4 @@
-import type { DocumentData, QueryDocumentSnapshot } from 'firebase/firestore'
+import type { DocumentData, QueryDocumentSnapshot } from 'firebase/firestore/lite'
 import { db } from '../services/firebase/app'
 
 export class FirebaseNotConfiguredError extends Error {

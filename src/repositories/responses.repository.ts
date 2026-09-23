@@ -1,4 +1,4 @@
-import { collection, doc, getDoc, getDocs, query, where, increment, writeBatch } from 'firebase/firestore'
+import { collection, doc, getDoc, getDocs, query, where, increment, writeBatch } from 'firebase/firestore/lite'
 import type { AnswerValue, Question, Response, ResponseAnswer, ResponseSource } from '../types/schema'
 import { requireDb } from './_firestore'
 import * as questionsRepository from './questions.repository'

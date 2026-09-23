@@ -1,6 +1,6 @@
 import { initializeApp, type FirebaseApp } from 'firebase/app'
 import { getAuth, type Auth } from 'firebase/auth'
-import { initializeFirestore, type Firestore } from 'firebase/firestore'
+import { initializeFirestore, type Firestore } from 'firebase/firestore/lite'
 import type { Analytics } from 'firebase/analytics'
 import type { FirebaseStorage } from 'firebase/storage'
 import { firebaseConfig, isFirebaseConfigured } from '../../config/firebaseConfig'

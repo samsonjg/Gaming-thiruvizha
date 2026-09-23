@@ -1,4 +1,4 @@
-import { doc, getDoc } from 'firebase/firestore'
+import { doc, getDoc } from 'firebase/firestore/lite'
 import type { Question } from '../types/schema'
 import { requireDb } from './_firestore'
 import * as optionsRepository from './options.repository'

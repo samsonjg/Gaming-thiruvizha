@@ -9,13 +9,20 @@ Every meaningful product or architecture change gets an entry here — see `AI_C
 - `scripts/add-admin.cjs` — creates a Firebase Auth account with a temporary password and grants the `admin` custom claim in one step, for provisioning additional admins. Deliberately kept as a local script rather than an in-app "add admin" UI: that would require a Cloud Function (custom claims and creating other users' accounts are Admin-SDK-only, server-side-only operations), which would force the project off the free Spark plan onto Blaze — not worth it for provisioning a handful of internal accounts. See `docs/ADMIN_PANEL.md`.
 - Renamed the Photo Challenge feature's display text to "Snap Hunt" (nav label, page headings, empty-state copy). Display-text-only — routes, collection names, and file/component names are unchanged.
 - Split the Snap Hunt upload button into two: "Take Photo" (opens the device camera directly via `capture="environment"`) and "Choose from Gallery" (opens the normal file/photo picker). Both feed the same validation/compression/preview flow.
-- `functions/index.js` (opt-in, not deployed by default) — a Cloud Function that disables project billing entirely once spend exceeds a configured Google Cloud budget, at the project owner's explicit request as a worst-case cost safety net. This is the first Cloud Function in this project; see `DEPLOYMENT.md` "Billing hard cutoff" for the required manual console steps and `SECURITY.md` for the tradeoffs (it takes the whole site offline with no grace period, indiscriminate of real abuse vs. a legitimate traffic spike).
+- `functions/index.js` — a Cloud Function that disables project billing entirely once spend exceeds a configured Google Cloud budget, at the project owner's explicit request as a worst-case cost safety net. This is the first Cloud Function in this project; see `DEPLOYMENT.md` "Billing hard cutoff" for the required manual console steps and `SECURITY.md` for the tradeoffs (it takes the whole site offline with no grace period, indiscriminate of real abuse vs. a legitimate traffic spike). Deployed and live.
 
 ### Database
 - Added `photoChallenges/{challengeId}` (+ nested `submissions/{uid}`, `gallery/{uid}`) to Firestore, and two new composite indexes (`photoChallenges: status ASC, createdAt DESC`; `submissions: status ASC, submittedAt DESC`) — added proactively this time, learning from the `questions` index incident on 2026-09-18. No existing Poll collection changed.
 
 ### Security
 - One-photo-change limit enforced in `firestore.rules` itself (not just the client): a user's self-update to their submission may only move `photoChangeCount` forward by exactly 1, and only while still below the challenge's configured `allowedPhotoChanges`. New `storage.rules` (Storage used for the first time in this project): owner-or-admin read/write/delete, content-type allowlist, size ceiling.
+
+## 2026-09-23
+
+### Changed
+- Switched every Firestore import from `firebase/firestore` to `firebase/firestore/lite` (repositories, `services/firebase/app.ts`, all type imports) — this app has never used `onSnapshot`, `runTransaction`, or offline persistence, so the lite SDK is a correctness-equivalent, much smaller alternative. Cut the Firestore chunk from ~154kB to ~51kB gzipped (~67% smaller). Verified end-to-end against the live Firebase project: full Poll flow (5 questions, including the `writeBatch`+`increment` result-aggregation write and the duplicate-check `getDoc`), Poll results/completion screens, and a real Snap Hunt submission all still work correctly. See `ARCHITECTURE.md` "Performance".
+- `RankingQuestion` (the only question type depending on `@dnd-kit`, ~25-30kB gzipped) is now `React.lazy`-loaded from `QuestionRenderer` instead of statically imported, so that dependency no longer ships to every public visitor regardless of whether their poll uses a ranking question.
+- Combined effect: initial public-page JS payload dropped from ~331kB to ~199kB gzipped (~40% smaller) — see `ARCHITECTURE.md` "Performance" for the full breakdown. Prompted by a user report that the site "rendered very slowly."
 
 ## 2026-09-18
 

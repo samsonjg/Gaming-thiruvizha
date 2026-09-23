@@ -13,7 +13,7 @@ import {
   startAfter,
   type QueryDocumentSnapshot,
   type DocumentData,
-} from 'firebase/firestore'
+} from 'firebase/firestore/lite'
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage'
 import type { PhotoSubmission, PhotoGalleryItem, SubmissionStatus } from '../types/schema'
 import { requireDb, withId } from './_firestore'

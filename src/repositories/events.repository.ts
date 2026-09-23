@@ -1,4 +1,4 @@
-import { collection, deleteDoc, doc, getDoc, getDocs, addDoc, updateDoc } from 'firebase/firestore'
+import { collection, deleteDoc, doc, getDoc, getDocs, addDoc, updateDoc } from 'firebase/firestore/lite'
 import type { EventRecord } from '../types/schema'
 import { requireDb, withId } from './_firestore'
 

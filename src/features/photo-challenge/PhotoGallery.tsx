@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { QueryDocumentSnapshot, DocumentData } from 'firebase/firestore'
+import type { QueryDocumentSnapshot, DocumentData } from 'firebase/firestore/lite'
 import type { PhotoGalleryItem } from '../../types/schema'
 import * as submissionsRepository from '../../repositories/photoSubmissions.repository'
 import { analytics } from '../../services/analytics/analytics'

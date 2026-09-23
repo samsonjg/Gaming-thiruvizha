@@ -1,4 +1,4 @@
-import { collection, doc, getDoc, getDocs, addDoc, updateDoc, query, where, orderBy, limit } from 'firebase/firestore'
+import { collection, doc, getDoc, getDocs, addDoc, updateDoc, query, where, orderBy, limit } from 'firebase/firestore/lite'
 import type { PhotoChallenge } from '../types/schema'
 import { requireDb, withId } from './_firestore'
 

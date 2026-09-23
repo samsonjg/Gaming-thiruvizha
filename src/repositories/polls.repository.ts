@@ -10,7 +10,7 @@ import {
   where,
   limit,
   writeBatch,
-} from 'firebase/firestore'
+} from 'firebase/firestore/lite'
 import type { Poll } from '../types/schema'
 import { requireDb, withId } from './_firestore'
 import * as questionsRepository from './questions.repository'

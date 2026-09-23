@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import type { QuestionComponentProps } from './types'
 import { SingleChoiceQuestion } from './SingleChoiceQuestion'
 import { MultipleChoiceQuestion } from './MultipleChoiceQuestion'
@@ -6,8 +7,13 @@ import { EmojiQuestion } from './EmojiQuestion'
 import { YesNoQuestion } from './YesNoQuestion'
 import { TextQuestion } from './TextQuestion'
 import { ImageChoiceQuestion } from './ImageChoiceQuestion'
-import { RankingQuestion } from './RankingQuestion'
 import type { AnswerValue, QuestionType } from '../../types/schema'
+
+// Lazy: the only question type that needs @dnd-kit (drag-and-drop
+// reordering). Splitting it out keeps that ~25-30kB dependency out of the
+// eager bundle every public visitor downloads, since most polls never use
+// a ranking question. See docs/ARCHITECTURE.md "Performance".
+const RankingQuestion = lazy(() => import('./RankingQuestion').then((m) => ({ default: m.RankingQuestion })))
 
 // Central dispatch: adding a new question type means adding one case here
 // (plus one entry in QUESTION_TYPE_META and one component).
@@ -28,7 +34,11 @@ export function QuestionRenderer(props: QuestionComponentProps) {
     case 'image_choice':
       return <ImageChoiceQuestion {...props} />
     case 'ranking':
-      return <RankingQuestion {...props} />
+      return (
+        <Suspense fallback={null}>
+          <RankingQuestion {...props} />
+        </Suspense>
+      )
     default:
       return null
   }
